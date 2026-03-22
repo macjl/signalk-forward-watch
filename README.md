@@ -230,6 +230,14 @@ A Signal K notification is sent for any detection **within 100m**. One notificat
 
 ---
 
+## Compatibility
+
+**Signal K v2.23.0 — Verified 2026-03-22**
+
+Following the automatic update of Signal K server to v2.23.0 on a Raspberry Pi 4 running Node.js v20.20.0, signalk-forward-watch v0.2.0 was verified against the new version. The plugin loaded cleanly at Signal K startup with no errors — it appeared in the plugins list as active, all Signal K API endpoints (position, SOG, COG, resources) continued to return 200 OK, and the server maintained stable uptime of 2+ hours with the plugin enabled. The only log entry related to the plugin was an onnxruntime GPU device discovery warning, which is cosmetic — the runtime falls back to CPU inference automatically and detection operates normally. No API breaking changes were identified between v2.22.1 and v2.23.0 that affect this plugin. The minimum recommended Signal K version has been updated to v2.23.0 in the v0.2.1 release.
+
+---
+
 ## License
 
 Apache 2.0 — see [LICENSE](LICENSE)
