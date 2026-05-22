@@ -6,11 +6,13 @@ class RtspGrabber {
   constructor(app) {
     this.app = app;
     this.currentProcess = null;
+    this.frameDir = path.join(app.getDataDirPath(), 'frames');
+    this.framePath = path.join(this.frameDir, 'latest.jpg');
   }
 
   async grabFrame(rtspUrl) {
     return new Promise((resolve) => {
-      const tempPath = '/tmp/fw-frame.jpg';
+      fs.mkdirSync(this.frameDir, { recursive: true });
       
       // Kill any existing process
       if (this.currentProcess) {
@@ -23,10 +25,10 @@ class RtspGrabber {
         .addOption('-q:v', '2')
         .on('end', () => {
           this.currentProcess = null;
-          if (fs.existsSync(tempPath)) {
-            resolve(tempPath);
+          if (fs.existsSync(this.framePath)) {
+            resolve(this.framePath);
           } else {
-            this.app.debug(`Failed to create frame file: ${tempPath}`);
+            this.app.debug(`Failed to create frame file: ${this.framePath}`);
             resolve(null);
           }
         })
@@ -38,7 +40,7 @@ class RtspGrabber {
         .on('start', () => {
           this.currentProcess = process;
         })
-        .save(tempPath);
+        .save(this.framePath);
 
       // Set timeout
       setTimeout(() => {
