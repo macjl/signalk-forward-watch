@@ -4,12 +4,12 @@
 const { assignTargetSlots } = require('./target-slots');
 
 const AIS_STATIC_DATA = {
-  ship:   { typeId: 70, typeName: 'Cargo', length: 80, beamRatio: 0.15, minLength: 20, maxLength: 200 },
-  boat:   { typeId: 37, typeName: 'Pleasure Craft', length: 12, beamRatio: 0.33, minLength: 3, maxLength: 30 },
-  debris: { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10 },
-  buoy:   { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10 },
-  kayak:  { typeId: 37, typeName: 'Pleasure Craft', length: 4, beamRatio: 0.25, minLength: 2, maxLength: 6 },
-  log:    { typeId: 99, typeName: 'Other Type', length: 2, beamRatio: 0.5, minLength: 1, maxLength: 12 }
+  ship:   { typeId: 70, typeName: 'Cargo', length: 80, beamRatio: 0.15, minLength: 20, maxLength: 200, approachSpeed: 5 },
+  boat:   { typeId: 37, typeName: 'Pleasure Craft', length: 12, beamRatio: 0.33, minLength: 3, maxLength: 30, approachSpeed: 2.5 },
+  debris: { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10, approachSpeed: 1 },
+  buoy:   { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10, approachSpeed: 1 },
+  kayak:  { typeId: 37, typeName: 'Pleasure Craft', length: 4, beamRatio: 0.25, minLength: 2, maxLength: 6, approachSpeed: 1.5 },
+  log:    { typeId: 99, typeName: 'Other Type', length: 2, beamRatio: 0.5, minLength: 1, maxLength: 12, approachSpeed: 1 }
 };
 const HORIZONTAL_FOV_DEG = 60;
 
@@ -19,6 +19,7 @@ const CLEAR_VALUES = [
   { path: 'name', value: null },
   { path: 'sensors.ais.class', value: null },
   { path: 'navigation.courseOverGroundTrue', value: null },
+  { path: 'navigation.headingTrue', value: null },
   { path: 'navigation.speedOverGround', value: null },
   { path: 'communication.callsignVhf', value: null },
   { path: 'design.aisShipType.id', value: null },
@@ -64,6 +65,7 @@ class OpenCPNOutput {
 
       if (this.isNmeaExportCompatEnabled()) {
         const staticData = getAisStaticData(d);
+        const approachHeading = getApproachHeading(d);
         values.push(
           {
             path: 'sensors.ais.class',
@@ -71,11 +73,15 @@ class OpenCPNOutput {
           },
           {
             path: 'navigation.courseOverGroundTrue',
-            value: 0
+            value: degreesToRadians(approachHeading)
+          },
+          {
+            path: 'navigation.headingTrue',
+            value: degreesToRadians(approachHeading)
           },
           {
             path: 'navigation.speedOverGround',
-            value: 0
+            value: staticData.approachSpeed
           },
           {
             path: 'communication.callsignVhf',
@@ -167,7 +173,8 @@ function getAisStaticData(detection) {
     typeId: defaults.typeId,
     typeName: defaults.typeName,
     length: roundMetres(length),
-    beam: roundMetres(clamp(length * defaults.beamRatio, 1, length))
+    beam: roundMetres(clamp(length * defaults.beamRatio, 1, length)),
+    approachSpeed: defaults.approachSpeed
   };
 }
 
@@ -181,6 +188,15 @@ function roundMetres(value) {
 
 function getCallSign(mmsi) {
   return `FW${String(mmsi).slice(-5)}`;
+}
+
+function getApproachHeading(detection) {
+  const bearing = typeof detection.bearing === 'number' ? detection.bearing : 0;
+  return (bearing + 180 + 360) % 360;
+}
+
+function degreesToRadians(degrees) {
+  return degrees * Math.PI / 180;
 }
 
 module.exports = OpenCPNOutput;
