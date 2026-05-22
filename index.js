@@ -64,6 +64,12 @@ module.exports = function(app) {
           type: 'boolean',
           title: 'Show detections in OpenCPN',
           default: true
+        },
+        ais_nmea_export_compat: {
+          type: 'boolean',
+          title: 'Enable NMEA AIS export compatibility for virtual targets',
+          description: 'Publishes extra AIS fields for NMEA converter plugins. Do not forward generated AIS messages to public AIS networks such as MarineTraffic or AIS Hub.',
+          default: false
         }
       },
       required: ['camera_ip', 'camera_user', 'camera_pass']
@@ -77,7 +83,7 @@ module.exports = function(app) {
       this.detector = new Detector(app, MODEL_PATH);
       this.gpsCalc = new GpsCalculator(app);
       this.skOutput = new SignalkOutput(app, options);
-      this.ocpnOutput = new OpenCPNOutput(app);
+      this.ocpnOutput = new OpenCPNOutput(app, options);
 
       // Load ONNX model
       await this.detector.init();

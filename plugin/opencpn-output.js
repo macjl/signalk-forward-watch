@@ -27,13 +27,16 @@ const PLUGIN_ID = 'signalk-forward-watch';
 const CLEAR_VALUES = [
   { path: 'navigation.position', value: null },
   { path: 'name', value: null },
+  { path: 'mmsi', value: null },
+  { path: 'sensors.ais.class', value: null },
   { path: 'navigation.courseOverGroundTrue', value: null },
   { path: 'navigation.speedOverGround', value: null }
 ];
 
 class OpenCPNOutput {
-  constructor(app) {
+  constructor(app, options) {
     this.app = app;
+    this.options = options || {};
     this.activeContexts = new Set();
   }
 
@@ -48,32 +51,46 @@ class OpenCPNOutput {
     const currentContexts = new Set(targets.map(target => target.context));
 
     for (const target of targets) {
-      const { detection: d, context, label } = target;
+      const { detection: d, context, label, mmsi } = target;
+      const values = [
+        {
+          path: 'navigation.position',
+          value: {
+            latitude: d.position.latitude,
+            longitude: d.position.longitude
+          }
+        },
+        {
+          path: 'name',
+          value: `${label} (${Math.round(d.confidence * 100)}%)`
+        }
+      ];
+
+      if (this.isNmeaExportCompatEnabled()) {
+        values.push(
+          {
+            path: 'mmsi',
+            value: mmsi
+          },
+          {
+            path: 'sensors.ais.class',
+            value: 'B'
+          },
+          {
+            path: 'navigation.courseOverGroundTrue',
+            value: 0
+          },
+          {
+            path: 'navigation.speedOverGround',
+            value: 0
+          }
+        );
+      }
 
       this.app.handleMessage(PLUGIN_ID, {
         context: `vessels.${context}`,
         updates: [{
-          values: [
-            {
-              path: 'navigation.position',
-              value: {
-                latitude: d.position.latitude,
-                longitude: d.position.longitude
-              }
-            },
-            {
-              path: 'name',
-              value: `${label} (${Math.round(d.confidence * 100)}%)`
-            },
-            {
-              path: 'navigation.courseOverGroundTrue',
-              value: (d.bearing || 0) * (Math.PI / 180)
-            },
-            {
-              path: 'navigation.speedOverGround',
-              value: 0
-            }
-          ]
+          values
         }]
       });
 
@@ -104,6 +121,10 @@ class OpenCPNOutput {
 
     this.app.debug(`OpenCPN: cleared ${context}`);
   }
+
+  isNmeaExportCompatEnabled() {
+    return this.options.ais_nmea_export_compat === true;
+  }
 }
 
 function assignTargetSlots(detections) {
@@ -127,7 +148,8 @@ function assignTargetSlots(detections) {
         targets.push({
           detection,
           context: `urn:mrn:imo:mmsi:${mmsi}`,
-          label: `${CLASS_LABEL[className]}-${slot}`
+          label: `${CLASS_LABEL[className]}-${slot}`,
+          mmsi
         });
       });
   }
