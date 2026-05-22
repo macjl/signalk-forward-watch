@@ -4,12 +4,12 @@
 const { assignTargetSlots } = require('./target-slots');
 
 const AIS_STATIC_DATA = {
-  ship:   { typeId: 70, typeName: 'Cargo', length: 80, beamRatio: 0.15, minLength: 20, maxLength: 200, approachSpeed: 5 },
-  boat:   { typeId: 37, typeName: 'Pleasure Craft', length: 12, beamRatio: 0.33, minLength: 3, maxLength: 30, approachSpeed: 2.5 },
-  debris: { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10, approachSpeed: 1 },
-  buoy:   { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10, approachSpeed: 1 },
-  kayak:  { typeId: 37, typeName: 'Pleasure Craft', length: 4, beamRatio: 0.25, minLength: 2, maxLength: 6, approachSpeed: 1.5 },
-  log:    { typeId: 99, typeName: 'Other Type', length: 2, beamRatio: 0.5, minLength: 1, maxLength: 12, approachSpeed: 1 }
+  ship:   { typeId: 70, typeName: 'Cargo', length: 80, beamRatio: 0.15, minLength: 20, maxLength: 200, crossingSpeed: 1.25 },
+  boat:   { typeId: 37, typeName: 'Pleasure Craft', length: 12, beamRatio: 0.33, minLength: 3, maxLength: 30, crossingSpeed: 0.625 },
+  debris: { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10, crossingSpeed: 0.25 },
+  buoy:   { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10, crossingSpeed: 0.25 },
+  kayak:  { typeId: 37, typeName: 'Pleasure Craft', length: 4, beamRatio: 0.25, minLength: 2, maxLength: 6, crossingSpeed: 0.375 },
+  log:    { typeId: 99, typeName: 'Other Type', length: 2, beamRatio: 0.5, minLength: 1, maxLength: 12, crossingSpeed: 0.25 }
 };
 const HORIZONTAL_FOV_DEG = 60;
 
@@ -65,7 +65,7 @@ class OpenCPNOutput {
 
       if (this.isNmeaExportCompatEnabled()) {
         const staticData = getAisStaticData(d);
-        const approachHeading = getApproachHeading(d);
+        const crossingHeading = getCrossingHeading(d);
         values.push(
           {
             path: 'sensors.ais.class',
@@ -73,15 +73,15 @@ class OpenCPNOutput {
           },
           {
             path: 'navigation.courseOverGroundTrue',
-            value: degreesToRadians(approachHeading)
+            value: degreesToRadians(crossingHeading)
           },
           {
             path: 'navigation.headingTrue',
-            value: degreesToRadians(approachHeading)
+            value: degreesToRadians(crossingHeading)
           },
           {
             path: 'navigation.speedOverGround',
-            value: staticData.approachSpeed
+            value: staticData.crossingSpeed
           },
           {
             path: 'communication.callsignVhf',
@@ -174,7 +174,7 @@ function getAisStaticData(detection) {
     typeName: defaults.typeName,
     length: roundMetres(length),
     beam: roundMetres(clamp(length * defaults.beamRatio, 1, length)),
-    approachSpeed: defaults.approachSpeed
+    crossingSpeed: defaults.crossingSpeed
   };
 }
 
@@ -190,9 +190,10 @@ function getCallSign(mmsi) {
   return `FW${String(mmsi).slice(-5)}`;
 }
 
-function getApproachHeading(detection) {
+function getCrossingHeading(detection) {
   const bearing = typeof detection.bearing === 'number' ? detection.bearing : 0;
-  return (bearing + 180 + 360) % 360;
+  const turn = typeof detection.cx === 'number' && detection.cx > 0.5 ? -90 : 90;
+  return (bearing + turn + 360) % 360;
 }
 
 function degreesToRadians(degrees) {
