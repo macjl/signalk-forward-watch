@@ -71,6 +71,8 @@ Forward Watch starts one persistent managed container named `sk-forward-watch-ff
 
 The container gets access to the Signal K config root via `signalkConfigRootMount`, then writes to Forward Watch's own `plugin-config-data/signalk-forward-watch/frames/latest.jpg` path. This keeps the frame file visible to the detector whether Signal K is running bare-metal or inside a container.
 
+If the container keeps running but stops updating `latest.jpg`, Forward Watch treats the frame as stale and restarts the managed FFmpeg container. This handles RTSP sessions that remain alive at Docker level while ffmpeg is no longer producing fresh JPEGs.
+
 ---
 
 ## Chart Plotter Integration
