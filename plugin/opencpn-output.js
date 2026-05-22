@@ -37,7 +37,6 @@ const PLUGIN_ID = 'signalk-forward-watch';
 const CLEAR_VALUES = [
   { path: 'navigation.position', value: null },
   { path: 'name', value: null },
-  { path: 'mmsi', value: null },
   { path: 'sensors.ais.class', value: null },
   { path: 'navigation.courseOverGroundTrue', value: null },
   { path: 'navigation.speedOverGround', value: null },
@@ -65,7 +64,7 @@ class OpenCPNOutput {
     const currentContexts = new Set(targets.map(target => target.context));
 
     for (const target of targets) {
-      const { detection: d, context, label, mmsi } = target;
+      const { detection: d, context, label } = target;
       const values = [
         {
           path: 'navigation.position',
@@ -83,10 +82,6 @@ class OpenCPNOutput {
       if (this.isNmeaExportCompatEnabled()) {
         const staticData = getAisStaticData(d);
         values.push(
-          {
-            path: 'mmsi',
-            value: mmsi
-          },
           {
             path: 'sensors.ais.class',
             value: 'B'
