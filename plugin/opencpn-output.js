@@ -4,12 +4,12 @@
 const { assignTargetSlots } = require('./target-slots');
 
 const AIS_STATIC_DATA = {
-  ship:   { typeId: 70, typeName: 'Cargo', length: 80, beamRatio: 0.15, minLength: 20, maxLength: 200, crossingSpeed: 1.25 },
-  boat:   { typeId: 37, typeName: 'Pleasure Craft', length: 12, beamRatio: 0.33, minLength: 3, maxLength: 30, crossingSpeed: 0.625 },
-  debris: { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10, crossingSpeed: 0.25 },
-  buoy:   { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10, crossingSpeed: 0.25 },
-  kayak:  { typeId: 37, typeName: 'Pleasure Craft', length: 4, beamRatio: 0.25, minLength: 2, maxLength: 6, crossingSpeed: 0.375 },
-  log:    { typeId: 99, typeName: 'Other Type', length: 2, beamRatio: 0.5, minLength: 1, maxLength: 12, crossingSpeed: 0.25 }
+  ship:   { typeId: 70, typeName: 'Cargo', length: 80, beamRatio: 0.15, minLength: 20, maxLength: 200 },
+  boat:   { typeId: 37, typeName: 'Pleasure Craft', length: 12, beamRatio: 0.33, minLength: 3, maxLength: 30 },
+  debris: { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10 },
+  buoy:   { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10 },
+  kayak:  { typeId: 37, typeName: 'Pleasure Craft', length: 4, beamRatio: 0.25, minLength: 2, maxLength: 6 },
+  log:    { typeId: 99, typeName: 'Other Type', length: 2, beamRatio: 0.5, minLength: 1, maxLength: 12 }
 };
 const HORIZONTAL_FOV_DEG = 60;
 
@@ -27,7 +27,9 @@ const CLEAR_VALUES = [
   { path: 'design.length.overall', value: null },
   { path: 'design.beam', value: null },
   { path: 'sensors.ais.fromBow', value: null },
-  { path: 'sensors.ais.fromCenter', value: null }
+  { path: 'sensors.ais.toStern', value: null },
+  { path: 'sensors.ais.fromCenter', value: null },
+  { path: 'sensors.ais.toPort', value: null }
 ];
 
 class OpenCPNOutput {
@@ -81,7 +83,7 @@ class OpenCPNOutput {
           },
           {
             path: 'navigation.speedOverGround',
-            value: staticData.crossingSpeed
+            value: 0
           },
           {
             path: 'communication.callsignVhf',
@@ -105,11 +107,19 @@ class OpenCPNOutput {
           },
           {
             path: 'sensors.ais.fromBow',
-            value: Math.max(0, Math.round(staticData.length / 2))
+            value: staticData.fromBow
+          },
+          {
+            path: 'sensors.ais.toStern',
+            value: staticData.toStern
           },
           {
             path: 'sensors.ais.fromCenter',
             value: 0
+          },
+          {
+            path: 'sensors.ais.toPort',
+            value: staticData.toPort
           }
         );
       }
@@ -156,7 +166,7 @@ class OpenCPNOutput {
 
 function getAisStaticData(detection) {
   const defaults = AIS_STATIC_DATA[detection.class_name] || AIS_STATIC_DATA.boat;
-  let length = defaults.length;
+  let estimatedLength = defaults.length;
 
   if (
     typeof detection.distance === 'number' &&
@@ -165,16 +175,21 @@ function getAisStaticData(detection) {
     const angularWidthRad = Math.max(0, detection.w) * HORIZONTAL_FOV_DEG * (Math.PI / 180);
     const apparentWidth = 2 * detection.distance * Math.tan(angularWidthRad / 2);
     if (Number.isFinite(apparentWidth) && apparentWidth > 0) {
-      length = clamp(apparentWidth, defaults.minLength, defaults.maxLength);
+      estimatedLength = clamp(apparentWidth, defaults.minLength, defaults.maxLength);
     }
   }
+
+  const length = roundMetres(estimatedLength);
+  const beam = roundMetres(clamp(length * defaults.beamRatio, 1, length));
 
   return {
     typeId: defaults.typeId,
     typeName: defaults.typeName,
-    length: roundMetres(length),
-    beam: roundMetres(clamp(length * defaults.beamRatio, 1, length)),
-    crossingSpeed: defaults.crossingSpeed
+    length,
+    beam,
+    fromBow: Math.max(0, Math.round(length / 2)),
+    toStern: Math.max(0, length - Math.round(length / 2)),
+    toPort: Math.max(0, beam)
   };
 }
 
