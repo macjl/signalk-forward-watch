@@ -180,7 +180,7 @@ function getAisStaticData(detection) {
   }
 
   const length = roundMetres(estimatedLength);
-  const beam = roundMetres(clamp(length * defaults.beamRatio, 1, length));
+  const beam = roundMetres(clamp(length * defaults.beamRatio, Math.min(2, length), length));
 
   return {
     typeId: defaults.typeId,
