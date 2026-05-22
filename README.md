@@ -91,6 +91,12 @@ http://<signalk-host>:3000/plugins/signalk-forward-watch/webapp/
 
 The page polls the plugin once per second. It only reloads the camera JPEG when a new detection cycle has produced a new frame, then draws detection boxes, virtual MMSI labels, distance, and bearing in the browser. No annotated image is generated server-side.
 
+### Camera calibration
+
+The WebApp includes a calibration panel for camera height, horizontal FOV, vertical FOV, forward axis, and horizon. Vertical FOV can be calculated automatically from the current image ratio and horizontal FOV, or entered manually.
+
+Calibration is saved as `calibration.json` in the plugin data directory. If no calibration file exists, Forward Watch keeps the original SkipperDon defaults: a 60 degree horizontal field of view, the forward axis at the image center, and the original box-height distance estimate.
+
 ---
 
 ## Chart Plotter Integration

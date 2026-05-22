@@ -3,6 +3,8 @@
 // a namespace object rather than the class on Node 22+).
 // Formula: Vincenty spherical, identical to geodesy's destinationPoint().
 const _R = 6371000;
+const { DEFAULT_CALIBRATION, normalizeCalibration } = require('./calibration');
+
 function _destinationPoint(lat, lon, distMetres, bearingDeg) {
   const δ = distMetres / _R;
   const θ = bearingDeg * Math.PI / 180;
@@ -25,16 +27,26 @@ class GpsCalculator {
   // detection: {cx, cy, w, h, class_name, confidence} (cx/cy/w/h normalized 0-1)
   // boatLat/boatLon: decimal degrees (null if no GPS)
   // boatHeading: degrees true
-  calculate(detection, boatLat, boatLon, boatHeading) {
+  calculate(detection, boatLat, boatLon, boatHeading, calibrationInput) {
     if (boatLat === null || boatLon === null) return null;
+    const calibration = normalizeCalibration(calibrationInput, DEFAULT_CALIBRATION);
 
-    // Monocular depth estimate: larger box height = closer object
-    // h=1.0 → ~5m, h=0.1 → ~50m, h=0.01 → ~500m
-    const h = Math.max(0.01, Math.min(1.0, detection.h));
-    const distance_m = Math.max(2, Math.min(500, 5 / h));
+    let distance_m;
+    if (calibration.calibrated) {
+      const targetY = Math.max(0, Math.min(1, detection.cy + detection.h / 2));
+      const verticalAngleDeg = (targetY - calibration.camera_horizon_y) * calibration.camera_vertical_fov_deg;
+      const verticalAngleRad = Math.max(0.1, verticalAngleDeg) * Math.PI / 180;
+      distance_m = Math.max(2, Math.min(500, calibration.camera_height_m / Math.tan(verticalAngleRad)));
+    } else {
+      const h = Math.max(0.01, Math.min(1.0, detection.h));
+      distance_m = Math.max(2, Math.min(500, 5 / h));
+    }
 
-    // Bearing: centre of frame = straight ahead; 60° FOV assumption
-    const bearing_deg = (boatHeading + ((detection.cx - 0.5) * 60) + 360) % 360;
+    const bearing_deg = (
+      boatHeading +
+      ((detection.cx - calibration.camera_center_x) * calibration.camera_horizontal_fov_deg) +
+      360
+    ) % 360;
 
     const dest = _destinationPoint(boatLat, boatLon, distance_m, bearing_deg);
 

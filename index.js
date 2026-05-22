@@ -8,9 +8,11 @@ const GpsCalculator = require('./plugin/gps-calculator');
 const SignalkOutput = require('./plugin/signalk-output');
 const OpenCPNOutput = require('./plugin/opencpn-output');
 const { assignTargetSlots } = require('./plugin/target-slots');
+const { DEFAULT_CALIBRATION, normalizeCalibration } = require('./plugin/calibration');
 
 const MODEL_PATH = path.join(__dirname, 'models', 'forward-watch.onnx');
 const PUBLIC_PATH = path.join(__dirname, 'public');
+const CALIBRATION_FILE = 'calibration.json';
 
 module.exports = function(app) {
   const plugin = {
@@ -119,6 +121,24 @@ module.exports = function(app) {
           detections: plugin.latestDetections || []
         });
       });
+
+      router.get('/api/calibration', (req, res) => {
+        res.setHeader('Cache-Control', 'no-store');
+        res.json(plugin.calibration || loadCalibration(app));
+      });
+
+      router.post('/api/calibration', (req, res) => {
+        readJsonRequest(req).then((body) => {
+          plugin.calibration = saveCalibration(
+            app,
+            normalizeCalibration(body, plugin.calibration || loadCalibration(app))
+          );
+          res.setHeader('Cache-Control', 'no-store');
+          res.json(plugin.calibration);
+        }).catch((err) => {
+          res.status(400).json({ error: err.message });
+        });
+      });
     },
 
     start: function(options) {
@@ -144,6 +164,7 @@ module.exports = function(app) {
       this.latestFrameVersion = null;
       this.latestTimestamp = null;
       this.latestDetections = [];
+      this.calibration = loadCalibration(app);
 
       // Load ONNX model
       await this.detector.init();
@@ -193,7 +214,7 @@ module.exports = function(app) {
 
           // Enrich detections with GPS position
           const enriched = detections.map(d => {
-            const gps = this.gpsCalc.calculate(d, boatLat, boatLon, boatHeading);
+            const gps = this.gpsCalc.calculate(d, boatLat, boatLon, boatHeading, this.calibration);
             return Object.assign({}, d, gps ? {
               position: { latitude: gps.lat, longitude: gps.lon },
               distance: gps.distance_m,
@@ -288,4 +309,53 @@ function getFrameVersion(framePath) {
   } catch (err) {
     return String(Date.now());
   }
+}
+
+function loadCalibration(app) {
+  const calibrationPath = getCalibrationPath(app);
+
+  try {
+    if (fs.existsSync(calibrationPath)) {
+      return normalizeCalibration(JSON.parse(fs.readFileSync(calibrationPath, 'utf8')), DEFAULT_CALIBRATION);
+    }
+  } catch (err) {
+    app.debug(`Failed to load Forward Watch calibration: ${err.message}`);
+  }
+
+  return normalizeCalibration(DEFAULT_CALIBRATION);
+}
+
+function saveCalibration(app, calibration) {
+  const normalized = normalizeCalibration(calibration);
+  const calibrationPath = getCalibrationPath(app);
+  fs.mkdirSync(path.dirname(calibrationPath), { recursive: true });
+  fs.writeFileSync(calibrationPath, JSON.stringify(normalized, null, 2));
+  return normalized;
+}
+
+function getCalibrationPath(app) {
+  return path.join(app.getDataDirPath(), CALIBRATION_FILE);
+}
+
+function readJsonRequest(req) {
+  if (req.body && typeof req.body === 'object') return Promise.resolve(req.body);
+
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+      if (body.length > 1024 * 1024) {
+        reject(new Error('Request body too large'));
+        req.destroy();
+      }
+    });
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (err) {
+        reject(new Error('Invalid JSON body'));
+      }
+    });
+    req.on('error', reject);
+  });
 }
