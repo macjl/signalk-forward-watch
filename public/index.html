@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Forward Watch</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #111;
+      color: #f4f4f4;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: #111;
+    }
+
+    .page {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+      min-height: 100vh;
+    }
+
+    .viewer {
+      display: grid;
+      place-items: center;
+      padding: 16px;
+      background: #050505;
+    }
+
+    .stage {
+      position: relative;
+      width: min(100%, calc((100vh - 32px) * var(--frame-ratio, 1.777778)));
+      aspect-ratio: var(--frame-aspect, 16 / 9);
+      background: #181818;
+      overflow: hidden;
+      border: 1px solid #333;
+    }
+
+    #frame {
+      width: 100%;
+      height: 100%;
+      display: block;
+      object-fit: fill;
+    }
+
+    #empty {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: #aaa;
+      font-size: 15px;
+      text-align: center;
+      padding: 24px;
+    }
+
+    .box {
+      position: absolute;
+      border: 2px solid #21d07a;
+      box-sizing: border-box;
+      min-width: 16px;
+      min-height: 16px;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.45);
+    }
+
+    .tag {
+      position: absolute;
+      left: -2px;
+      bottom: 100%;
+      max-width: min(320px, 80vw);
+      padding: 4px 6px;
+      background: rgba(0, 0, 0, 0.78);
+      border: 1px solid #21d07a;
+      color: #fff;
+      font-size: 12px;
+      line-height: 1.25;
+      white-space: nowrap;
+      transform: translateY(-4px);
+    }
+
+    .panel {
+      border-left: 1px solid #303030;
+      background: #181818;
+      padding: 16px;
+      overflow: auto;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 20px;
+      font-weight: 650;
+    }
+
+    .meta {
+      display: grid;
+      gap: 4px;
+      margin-bottom: 16px;
+      color: #aaa;
+      font-size: 13px;
+    }
+
+    .count {
+      color: #f4f4f4;
+      font-weight: 600;
+    }
+
+    .list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .item {
+      border: 1px solid #333;
+      background: #202020;
+      padding: 10px;
+    }
+
+    .item-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .item-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 10px;
+      color: #bdbdbd;
+      font-size: 12px;
+    }
+
+    .muted {
+      color: #8d8d8d;
+    }
+
+    @media (max-width: 900px) {
+      .page {
+        grid-template-columns: 1fr;
+      }
+
+      .panel {
+        border-left: 0;
+        border-top: 1px solid #303030;
+      }
+
+      .stage {
+        width: min(100%, calc(100vw - 32px));
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="viewer">
+      <div class="stage" id="stage">
+        <img id="frame" alt="Forward camera frame">
+        <div id="overlay"></div>
+        <div id="empty">Waiting for the first camera frame</div>
+      </div>
+    </section>
+    <aside class="panel">
+      <h1>Forward Watch</h1>
+      <div class="meta">
+        <div>Status: <span id="status">connecting</span></div>
+        <div>Updated: <span id="updated">never</span></div>
+        <div>Detections: <span class="count" id="count">0</span></div>
+      </div>
+      <div class="list" id="list"></div>
+    </aside>
+  </main>
+
+  <script>
+    const frame = document.getElementById('frame');
+    const overlay = document.getElementById('overlay');
+    const empty = document.getElementById('empty');
+    const stage = document.getElementById('stage');
+    const statusEl = document.getElementById('status');
+    const updatedEl = document.getElementById('updated');
+    const countEl = document.getElementById('count');
+    const list = document.getElementById('list');
+    const API_BASE = '/plugins/signalk-forward-watch/api';
+
+    let lastFrameVersion = null;
+
+    frame.addEventListener('load', () => {
+      if (!frame.naturalWidth || !frame.naturalHeight) return;
+      stage.style.setProperty('--frame-ratio', String(frame.naturalWidth / frame.naturalHeight));
+      stage.style.setProperty('--frame-aspect', `${frame.naturalWidth} / ${frame.naturalHeight}`);
+    });
+
+    async function refresh() {
+      try {
+        const response = await fetch(`${API_BASE}/latest-state`, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const state = await response.json();
+        statusEl.textContent = state.frameVersion ? 'live' : 'waiting';
+        updatedEl.textContent = state.timestamp ? new Date(state.timestamp).toLocaleTimeString() : 'never';
+
+        if (state.frameUrl && state.frameVersion !== lastFrameVersion) {
+          lastFrameVersion = state.frameVersion;
+          frame.src = state.frameUrl;
+          empty.style.display = 'none';
+        }
+
+        renderDetections(Array.isArray(state.detections) ? state.detections : []);
+      } catch (error) {
+        statusEl.textContent = `error: ${error.message}`;
+      }
+    }
+
+    function renderDetections(detections) {
+      overlay.replaceChildren();
+      list.replaceChildren();
+      countEl.textContent = String(detections.length);
+
+      if (detections.length === 0) {
+        const div = document.createElement('div');
+        div.className = 'muted';
+        div.textContent = 'No detections';
+        list.appendChild(div);
+        return;
+      }
+
+      for (const detection of detections) {
+        renderBox(detection);
+        renderListItem(detection);
+      }
+    }
+
+    function renderBox(detection) {
+      const box = document.createElement('div');
+      box.className = 'box';
+      const left = clamp((detection.cx - detection.w / 2) * 100, 0, 100);
+      const top = clamp((detection.cy - detection.h / 2) * 100, 0, 100);
+      const width = clamp(detection.w * 100, 1, 100 - left);
+      const height = clamp(detection.h * 100, 1, 100 - top);
+      box.style.left = `${left}%`;
+      box.style.top = `${top}%`;
+      box.style.width = `${width}%`;
+      box.style.height = `${height}%`;
+
+      const tag = document.createElement('div');
+      tag.className = 'tag';
+      tag.textContent = labelFor(detection);
+      box.appendChild(tag);
+      overlay.appendChild(box);
+    }
+
+    function renderListItem(detection) {
+      const item = document.createElement('div');
+      item.className = 'item';
+
+      const title = document.createElement('div');
+      title.className = 'item-title';
+
+      const name = document.createElement('span');
+      name.textContent = detection.ais?.label || detection.class_name || 'target';
+      const confidence = document.createElement('span');
+      confidence.textContent = `${Math.round((detection.confidence || 0) * 100)}%`;
+      title.append(name, confidence);
+
+      const grid = document.createElement('div');
+      grid.className = 'item-grid';
+      addField(grid, 'MMSI', detection.ais?.mmsi || '-');
+      addField(grid, 'Distance', typeof detection.distance === 'number' ? `${detection.distance} m` : '-');
+      addField(grid, 'Bearing', typeof detection.bearing === 'number' ? `${detection.bearing} deg` : '-');
+      addField(grid, 'Side', detection.quadrant || '-');
+
+      item.append(title, grid);
+      list.appendChild(item);
+    }
+
+    function addField(parent, name, value) {
+      const label = document.createElement('span');
+      label.className = 'muted';
+      label.textContent = name;
+      const content = document.createElement('span');
+      content.textContent = String(value);
+      parent.append(label, content);
+    }
+
+    function labelFor(detection) {
+      const name = detection.ais?.label || detection.class_name || 'target';
+      const parts = [name];
+      if (detection.ais?.mmsi) parts.push(String(detection.ais.mmsi));
+      if (typeof detection.distance === 'number') parts.push(`${detection.distance} m`);
+      if (typeof detection.bearing === 'number') parts.push(`${detection.bearing} deg`);
+      return parts.join(' | ');
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    refresh();
+    setInterval(refresh, 1000);
+  </script>
+</body>
+</html>

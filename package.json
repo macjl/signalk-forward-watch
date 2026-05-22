@@ -5,6 +5,7 @@
   "keywords": [
     "signalk",
     "signalk-node-server-plugin",
+    "signalk-webapp",
     "marine",
     "safety",
     "obstacle-detection",
@@ -21,6 +22,9 @@
   "signalk-plugin": {
     "id": "signalk-forward-watch",
     "name": "Forward Watch"
+  },
+  "signalk": {
+    "displayName": "Forward Watch"
   },
   "dependencies": {
     "onnxruntime-node": "^1.17.0",

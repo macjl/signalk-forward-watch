@@ -75,6 +75,24 @@ If the container keeps running but stops updating `latest.jpg`, Forward Watch tr
 
 ---
 
+## Camera Overlay WebApp
+
+Forward Watch exposes a lightweight camera overlay as a standard Signal K WebApp:
+
+```text
+http://<signalk-host>:3000/signalk-forward-watch/
+```
+
+The same page is also available through the plugin route:
+
+```text
+http://<signalk-host>:3000/plugins/signalk-forward-watch/webapp/
+```
+
+The page polls the plugin once per second. It only reloads the camera JPEG when a new detection cycle has produced a new frame, then draws detection boxes, virtual MMSI labels, distance, and bearing in the browser. No annotated image is generated server-side.
+
+---
+
 ## Chart Plotter Integration
 
 When **Show detections in OpenCPN** is enabled, each detected object is written into Signal K as a vessel with a dedicated fake MMSI. Chart plotters that can read Signal K or NMEA 0183 AIS data will display them as AIS targets.

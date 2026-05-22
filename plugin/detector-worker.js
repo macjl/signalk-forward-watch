@@ -29,8 +29,14 @@ parentPort.on('message', async (msg) => {
       return;
     }
     try {
+      const metadata = await sharp(msg.imagePath).metadata();
+      const sourceWidth = metadata.width || IMG_SIZE;
+      const sourceHeight = metadata.height || IMG_SIZE;
       const { data } = await sharp(msg.imagePath)
-        .resize(IMG_SIZE, IMG_SIZE)
+        .resize(IMG_SIZE, IMG_SIZE, {
+          fit: 'contain',
+          background: { r: 114, g: 114, b: 114 }
+        })
         .removeAlpha()
         .raw()
         .toBuffer({ resolveWithObject: true });
@@ -45,7 +51,7 @@ parentPort.on('message', async (msg) => {
       const input = new ort.Tensor('float32', tensor, [1, 3, IMG_SIZE, IMG_SIZE]);
       const outputMap = await session.run({ images: input });
       const outputTensor = outputMap[Object.keys(outputMap)[0]];
-      const detections = parseOutput(outputTensor, msg.confidenceThreshold);
+      const detections = parseOutput(outputTensor, msg.confidenceThreshold, sourceWidth, sourceHeight);
 
       parentPort.postMessage({ type: 'detections', detections });
     } catch (err) {
@@ -55,10 +61,15 @@ parentPort.on('message', async (msg) => {
 });
 
 // YOLOv8 ONNX output shape: [1, 4+num_classes, num_anchors] = [1, 10, 8400]
-function parseOutput(tensor, confidenceThreshold) {
+function parseOutput(tensor, confidenceThreshold, sourceWidth, sourceHeight) {
   const data = tensor.data;
   const numClasses = CLASS_NAMES.length;
   const numAnchors = tensor.dims[2];
+  const scale = Math.min(IMG_SIZE / sourceWidth, IMG_SIZE / sourceHeight);
+  const resizedWidth = sourceWidth * scale;
+  const resizedHeight = sourceHeight * scale;
+  const padX = (IMG_SIZE - resizedWidth) / 2;
+  const padY = (IMG_SIZE - resizedHeight) / 2;
 
   let boxes = [];
   for (let i = 0; i < numAnchors; i++) {
@@ -74,19 +85,36 @@ function parseOutput(tensor, confidenceThreshold) {
     }
 
     if (bestScore >= confidenceThreshold) {
+      const mapped = mapBoxToSource(cx, cy, w, h, padX, padY, resizedWidth, resizedHeight);
+      if (!mapped) continue;
       boxes.push({
         class_id:   bestClass,
         class_name: CLASS_NAMES[bestClass],
         confidence: bestScore,
-        cx: cx / IMG_SIZE,
-        cy: cy / IMG_SIZE,
-        w:  w  / IMG_SIZE,
-        h:  h  / IMG_SIZE
+        cx: mapped.cx,
+        cy: mapped.cy,
+        w:  mapped.w,
+        h:  mapped.h
       });
     }
   }
 
   return nms(boxes, 0.45);
+}
+
+function mapBoxToSource(cx, cy, w, h, padX, padY, resizedWidth, resizedHeight) {
+  const x1 = clamp((cx - w / 2 - padX) / resizedWidth, 0, 1);
+  const y1 = clamp((cy - h / 2 - padY) / resizedHeight, 0, 1);
+  const x2 = clamp((cx + w / 2 - padX) / resizedWidth, 0, 1);
+  const y2 = clamp((cy + h / 2 - padY) / resizedHeight, 0, 1);
+
+  if (x2 <= x1 || y2 <= y1) return null;
+  return {
+    cx: (x1 + x2) / 2,
+    cy: (y1 + y2) / 2,
+    w: x2 - x1,
+    h: y2 - y1
+  };
 }
 
 function nms(boxes, iouThreshold) {
@@ -110,4 +138,8 @@ function iou(a, b) {
   if (ix1 >= ix2 || iy1 >= iy2) return 0;
   const inter = (ix2 - ix1) * (iy2 - iy1);
   return inter / ((a.w * a.h) + (b.w * b.h) - inter);
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
 }

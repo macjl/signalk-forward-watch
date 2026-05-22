@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const CameraDiscovery = require('./plugin/camera-discovery');
 const RtspGrabber = require('./plugin/rtsp-grabber');
 const ContainerRtspGrabber = require('./plugin/container-rtsp-grabber');
@@ -6,8 +7,10 @@ const Detector = require('./plugin/detector');
 const GpsCalculator = require('./plugin/gps-calculator');
 const SignalkOutput = require('./plugin/signalk-output');
 const OpenCPNOutput = require('./plugin/opencpn-output');
+const { assignTargetSlots } = require('./plugin/target-slots');
 
 const MODEL_PATH = path.join(__dirname, 'models', 'forward-watch.onnx');
+const PUBLIC_PATH = path.join(__dirname, 'public');
 
 module.exports = function(app) {
   const plugin = {
@@ -81,6 +84,43 @@ module.exports = function(app) {
       required: ['camera_ip', 'camera_user', 'camera_pass']
     },
 
+    registerWithRouter: function(router) {
+      router.get('/', (req, res) => {
+        res.redirect('webapp/');
+      });
+
+      router.get('/webapp', (req, res) => {
+        res.redirect('webapp/');
+      });
+
+      router.get('/webapp/', (req, res) => {
+        res.sendFile(path.join(PUBLIC_PATH, 'index.html'));
+      });
+
+      router.get('/api/latest-frame', (req, res) => {
+        const framePath = plugin.latestFramePath;
+        if (!framePath || !fs.existsSync(framePath)) {
+          res.status(404).json({ error: 'No frame available yet' });
+          return;
+        }
+
+        res.setHeader('Cache-Control', 'no-store');
+        res.sendFile(framePath);
+      });
+
+      router.get('/api/latest-state', (req, res) => {
+        res.setHeader('Cache-Control', 'no-store');
+        res.json({
+          timestamp: plugin.latestTimestamp || null,
+          frameVersion: plugin.latestFrameVersion || null,
+          frameUrl: plugin.latestFrameVersion
+            ? `/plugins/${plugin.id}/api/latest-frame?v=${encodeURIComponent(plugin.latestFrameVersion)}`
+            : null,
+          detections: plugin.latestDetections || []
+        });
+      });
+    },
+
     start: function(options) {
       options = options || {};
       this.startAsync(options).catch((err) => {
@@ -100,6 +140,10 @@ module.exports = function(app) {
       this.gpsCalc = new GpsCalculator(app);
       this.skOutput = new SignalkOutput(app, options);
       this.ocpnOutput = new OpenCPNOutput(app);
+      this.latestFramePath = null;
+      this.latestFrameVersion = null;
+      this.latestTimestamp = null;
+      this.latestDetections = [];
 
       // Load ONNX model
       await this.detector.init();
@@ -157,6 +201,29 @@ module.exports = function(app) {
               quadrant: d.cx < 0.5 ? 'port' : 'starboard'
             } : {});
           });
+          const withPosition = enriched.filter(d =>
+            d.position &&
+            typeof d.position.latitude === 'number' &&
+            typeof d.position.longitude === 'number'
+          );
+          const targetByDetection = new Map(
+            assignTargetSlots(withPosition).map(target => [target.detection, target])
+          );
+          const visibleDetections = enriched.map(d => {
+            const target = targetByDetection.get(d);
+            return Object.assign({}, d, target ? {
+              ais: {
+                context: target.context,
+                label: target.label,
+                mmsi: target.mmsi
+              }
+            } : {});
+          });
+
+          this.latestFramePath = framePath;
+          this.latestFrameVersion = getFrameVersion(framePath);
+          this.latestTimestamp = new Date().toISOString();
+          this.latestDetections = visibleDetections;
 
           this.skOutput.sendDetections(enriched);
           if (options.opencpn_enabled !== false) this.ocpnOutput.sendDetections(enriched);
@@ -213,4 +280,12 @@ function redactRtspUrl(rtspUrl) {
 
 function radiansToDegrees(value) {
   return value * 180 / Math.PI;
+}
+
+function getFrameVersion(framePath) {
+  try {
+    return String(Math.round(fs.statSync(framePath).mtimeMs));
+  } catch (err) {
+    return String(Date.now());
+  }
 }
