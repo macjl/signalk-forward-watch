@@ -23,6 +23,16 @@ const CLASS_LABEL = {
   log:    'FW-LOG'
 };
 
+const AIS_STATIC_DATA = {
+  ship:   { typeId: 70, typeName: 'Cargo', length: 80, beamRatio: 0.15, minLength: 20, maxLength: 200 },
+  boat:   { typeId: 37, typeName: 'Pleasure Craft', length: 12, beamRatio: 0.33, minLength: 3, maxLength: 30 },
+  debris: { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10 },
+  buoy:   { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10 },
+  kayak:  { typeId: 37, typeName: 'Pleasure Craft', length: 4, beamRatio: 0.25, minLength: 2, maxLength: 6 },
+  log:    { typeId: 99, typeName: 'Other Type', length: 2, beamRatio: 0.5, minLength: 1, maxLength: 12 }
+};
+const HORIZONTAL_FOV_DEG = 60;
+
 const PLUGIN_ID = 'signalk-forward-watch';
 const CLEAR_VALUES = [
   { path: 'navigation.position', value: null },
@@ -30,7 +40,11 @@ const CLEAR_VALUES = [
   { path: 'mmsi', value: null },
   { path: 'sensors.ais.class', value: null },
   { path: 'navigation.courseOverGroundTrue', value: null },
-  { path: 'navigation.speedOverGround', value: null }
+  { path: 'navigation.speedOverGround', value: null },
+  { path: 'design.aisShipType.id', value: null },
+  { path: 'design.aisShipType.name', value: null },
+  { path: 'design.length.overall', value: null },
+  { path: 'design.beam', value: null }
 ];
 
 class OpenCPNOutput {
@@ -67,6 +81,7 @@ class OpenCPNOutput {
       ];
 
       if (this.isNmeaExportCompatEnabled()) {
+        const staticData = getAisStaticData(d);
         values.push(
           {
             path: 'mmsi',
@@ -83,6 +98,22 @@ class OpenCPNOutput {
           {
             path: 'navigation.speedOverGround',
             value: 0
+          },
+          {
+            path: 'design.aisShipType.id',
+            value: staticData.typeId
+          },
+          {
+            path: 'design.aisShipType.name',
+            value: staticData.typeName
+          },
+          {
+            path: 'design.length.overall',
+            value: staticData.length
+          },
+          {
+            path: 'design.beam',
+            value: staticData.beam
           }
         );
       }
@@ -125,6 +156,37 @@ class OpenCPNOutput {
   isNmeaExportCompatEnabled() {
     return this.options.ais_nmea_export_compat === true;
   }
+}
+
+function getAisStaticData(detection) {
+  const defaults = AIS_STATIC_DATA[detection.class_name] || AIS_STATIC_DATA.boat;
+  let length = defaults.length;
+
+  if (
+    typeof detection.distance === 'number' &&
+    typeof detection.w === 'number'
+  ) {
+    const angularWidthRad = Math.max(0, detection.w) * HORIZONTAL_FOV_DEG * (Math.PI / 180);
+    const apparentWidth = 2 * detection.distance * Math.tan(angularWidthRad / 2);
+    if (Number.isFinite(apparentWidth) && apparentWidth > 0) {
+      length = clamp(apparentWidth, defaults.minLength, defaults.maxLength);
+    }
+  }
+
+  return {
+    typeId: defaults.typeId,
+    typeName: defaults.typeName,
+    length: roundMetres(length),
+    beam: roundMetres(clamp(length * defaults.beamRatio, 1, length))
+  };
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function roundMetres(value) {
+  return Math.max(1, Math.round(value));
 }
 
 function assignTargetSlots(detections) {
