@@ -40,10 +40,13 @@ const CLEAR_VALUES = [
   { path: 'sensors.ais.class', value: null },
   { path: 'navigation.courseOverGroundTrue', value: null },
   { path: 'navigation.speedOverGround', value: null },
+  { path: 'communication.callsignVhf', value: null },
   { path: 'design.aisShipType.id', value: null },
   { path: 'design.aisShipType.name', value: null },
   { path: 'design.length.overall', value: null },
-  { path: 'design.beam', value: null }
+  { path: 'design.beam', value: null },
+  { path: 'sensors.ais.fromBow', value: null },
+  { path: 'sensors.ais.fromCenter', value: null }
 ];
 
 class OpenCPNOutput {
@@ -95,6 +98,10 @@ class OpenCPNOutput {
             value: 0
           },
           {
+            path: 'communication.callsignVhf',
+            value: getCallSign(target.mmsi)
+          },
+          {
             path: 'design.aisShipType.id',
             value: staticData.typeId
           },
@@ -109,6 +116,14 @@ class OpenCPNOutput {
           {
             path: 'design.beam',
             value: staticData.beam
+          },
+          {
+            path: 'sensors.ais.fromBow',
+            value: Math.max(0, Math.round(staticData.length / 2))
+          },
+          {
+            path: 'sensors.ais.fromCenter',
+            value: 0
           }
         );
       }
@@ -182,6 +197,10 @@ function clamp(value, min, max) {
 
 function roundMetres(value) {
   return Math.max(1, Math.round(value));
+}
+
+function getCallSign(mmsi) {
+  return `FW${String(mmsi).slice(-5)}`;
 }
 
 function assignTargetSlots(detections) {
