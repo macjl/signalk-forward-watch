@@ -1,6 +1,7 @@
-// Inline haversine helpers — geodesy v2 is ESM-only and cannot be require()'d
-// from a CommonJS plugin. These formulae are equivalent to geodesy's
-// LatLonSpherical.destinationPoint() on a spherical earth (R = 6371 km).
+// Inline spherical earth destination point — replaces geodesy v2 (ESM-only,
+// cannot be require()'d from a CommonJS plugin on Node < 22, and returns
+// a namespace object rather than the class on Node 22+).
+// Formula: Vincenty spherical, identical to geodesy's destinationPoint().
 const _R = 6371000;
 function _destinationPoint(lat, lon, distMetres, bearingDeg) {
   const δ = distMetres / _R;
@@ -13,10 +14,7 @@ function _destinationPoint(lat, lon, distMetres, bearingDeg) {
     Math.sin(θ) * Math.sin(δ) * Math.cos(φ1),
     Math.cos(δ) - Math.sin(φ1) * sinφ2
   );
-  return {
-    lat: φ2 * 180 / Math.PI,
-    lon: ((λ2 * 180 / Math.PI) + 540) % 360 - 180
-  };
+  return { lat: φ2 * 180 / Math.PI, lon: ((λ2 * 180 / Math.PI) + 540) % 360 - 180 };
 }
 
 class GpsCalculator {
