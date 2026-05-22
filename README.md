@@ -62,6 +62,7 @@ Restart Signal K and enable the plugin in **Admin → Plugin Config → Forward 
 | **Enable audio alarm** | `false` | Plays a system beep on detection within 100m. Requires audio output on the host. |
 | **Confidence threshold** | `0.4` | Minimum detection confidence (0–1). Lower = more detections but more false positives. 0.4 is a good starting point. |
 | **Show detections in OpenCPN** | `true` | Sends detections to OpenCPN as AIS targets on the chart. Requires boat GPS. |
+| **Enable NMEA AIS export compatibility for virtual targets** | `false` | Publishes extra AIS fields for NMEA converter plugins. Do not forward generated AIS messages to public AIS networks. |
 
 ### FFmpeg Container Mode
 
@@ -115,6 +116,8 @@ When **Show detections in OpenCPN** is enabled, each detected object is written 
 The final MMSI digit identifies the detection class, preserving the original single-target values for the first object of each class. Simultaneous detections of the same class are sorted left-to-right in the camera frame and assigned slots 1-99, so multiple boats can appear as separate chart targets instead of overwriting the same fake vessel.
 
 Forward Watch clears virtual AIS targets that are no longer detected on the next detection cycle. It removes only the Signal K paths it publishes for its own fake MMSI contexts, so the chart stays aligned with the current AI detections.
+
+NMEA AIS export compatibility is disabled by default. When enabled, Forward Watch also publishes `mmsi`, `sensors.ais.class = B`, `navigation.courseOverGroundTrue = 0`, and `navigation.speedOverGround = 0` so converter plugins such as `signalk-vessels-to-ais` can emit NMEA AIS sentences. These are generated virtual targets: do not forward them to public AIS networks such as MarineTraffic or AIS Hub.
 
 ### OpenCPN (Signal K connection)
 
