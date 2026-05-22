@@ -64,14 +64,6 @@ class OpenCPNOutput {
             {
               path: 'name',
               value: `${label} (${Math.round(d.confidence * 100)}%)`
-            },
-            {
-              path: 'navigation.courseOverGroundTrue',
-              value: (d.bearing || 0) * (Math.PI / 180)
-            },
-            {
-              path: 'navigation.speedOverGround',
-              value: 0
             }
           ]
         }]
