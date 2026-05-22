@@ -117,7 +117,7 @@ The final MMSI digit identifies the detection class, preserving the original sin
 
 Forward Watch clears virtual AIS targets that are no longer detected on the next detection cycle. It removes only the Signal K paths it publishes for its own fake MMSI contexts, so the chart stays aligned with the current AI detections.
 
-NMEA AIS export compatibility is disabled by default. When enabled, Forward Watch also publishes `mmsi`, `sensors.ais.class = B`, `navigation.courseOverGroundTrue = 0`, `navigation.speedOverGround = 0`, and approximate static AIS fields under `design.aisShipType`, `design.length.overall`, and `design.beam` so converter plugins such as `signalk-vessels-to-ais` can emit NMEA AIS sentences. Length is estimated from the detected box width, estimated distance, and the plugin's horizontal FOV assumption, then bounded by detection class. These are generated virtual targets with estimated characteristics: do not forward them to public AIS networks such as MarineTraffic or AIS Hub.
+NMEA AIS export compatibility is disabled by default. When enabled, Forward Watch uses the MMSI embedded in each virtual vessel context and publishes `sensors.ais.class = B`, `navigation.courseOverGroundTrue = 0`, `navigation.speedOverGround = 0`, and approximate static AIS fields under `design.aisShipType`, `design.length.overall`, and `design.beam` so converter plugins such as `signalk-vessels-to-ais` can emit NMEA AIS sentences. Length is estimated from the detected box width, estimated distance, and the plugin's horizontal FOV assumption, then bounded by detection class. These are generated virtual targets with estimated characteristics: do not forward them to public AIS networks such as MarineTraffic or AIS Hub.
 
 ### OpenCPN (Signal K connection)
 
