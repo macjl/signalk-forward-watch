@@ -47,6 +47,25 @@
       object-fit: fill;
     }
 
+    #overlay,
+    #calibration-overlay {
+      position: absolute;
+      inset: 0;
+    }
+
+    #overlay {
+      pointer-events: none;
+    }
+
+    #calibration-overlay {
+      z-index: 3;
+      display: none;
+    }
+
+    body.calibrating #calibration-overlay {
+      display: block;
+    }
+
     #empty {
       position: absolute;
       inset: 0;
@@ -82,6 +101,53 @@
       transform: translateY(-4px);
     }
 
+    .cal-line {
+      position: absolute;
+      color: #ffcc33;
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    .cal-line::after {
+      position: absolute;
+      padding: 3px 5px;
+      background: rgba(0, 0, 0, 0.78);
+      border: 1px solid currentColor;
+      color: #fff;
+      font-size: 11px;
+      line-height: 1;
+      white-space: nowrap;
+      content: attr(data-label);
+    }
+
+    .cal-line.center {
+      top: 0;
+      bottom: 0;
+      width: 18px;
+      margin-left: -9px;
+      border-left: 2px solid currentColor;
+      cursor: ew-resize;
+    }
+
+    .cal-line.center::after {
+      top: 8px;
+      left: 6px;
+    }
+
+    .cal-line.horizon {
+      left: 0;
+      right: 0;
+      height: 18px;
+      margin-top: -9px;
+      border-top: 2px solid currentColor;
+      cursor: ns-resize;
+    }
+
+    .cal-line.horizon::after {
+      top: 6px;
+      right: 8px;
+    }
+
     .panel {
       border-left: 1px solid #303030;
       background: #181818;
@@ -111,6 +177,93 @@
     .list {
       display: grid;
       gap: 8px;
+    }
+
+    .section {
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid #303030;
+    }
+
+    #calibration-panel {
+      display: none;
+    }
+
+    body.calibrating #calibration-panel {
+      display: block;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      font-weight: 650;
+    }
+
+    .control {
+      display: grid;
+      gap: 5px;
+      margin-bottom: 10px;
+      color: #bdbdbd;
+      font-size: 12px;
+    }
+
+    .control input {
+      width: 100%;
+      box-sizing: border-box;
+      border: 1px solid #3a3a3a;
+      background: #101010;
+      color: #f4f4f4;
+      padding: 7px 8px;
+      font: inherit;
+    }
+
+    .check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0 10px;
+      color: #bdbdbd;
+      font-size: 12px;
+    }
+
+    .check input {
+      width: 16px;
+      height: 16px;
+      margin: 0;
+    }
+
+    .button-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    button {
+      border: 1px solid #3a3a3a;
+      background: #242424;
+      color: #f4f4f4;
+      padding: 8px;
+      font: inherit;
+      cursor: pointer;
+    }
+
+    button.active {
+      border-color: #ffcc33;
+      color: #ffcc33;
+    }
+
+    #start-calibration,
+    #save-calibration {
+      width: 100%;
+    }
+
+    #start-calibration {
+      margin-top: 4px;
+    }
+
+    #save-calibration {
+      border-color: #21d07a;
     }
 
     .item {
@@ -162,6 +315,10 @@
       <div class="stage" id="stage">
         <img id="frame" alt="Forward camera frame">
         <div id="overlay"></div>
+        <div id="calibration-overlay">
+          <div class="cal-line center" id="center-line" data-label="Forward"></div>
+          <div class="cal-line horizon" id="horizon-line" data-label="Horizon"></div>
+        </div>
         <div id="empty">Waiting for the first camera frame</div>
       </div>
     </section>
@@ -173,6 +330,33 @@
         <div>Detections: <span class="count" id="count">0</span></div>
       </div>
       <div class="list" id="list"></div>
+      <section class="section">
+        <h2>Calibration</h2>
+        <button id="start-calibration" type="button">Calibrate camera</button>
+        <div id="calibration-panel">
+          <label class="control">
+            Camera height (m)
+            <input id="camera-height" type="number" min="0.1" max="20" step="0.1">
+          </label>
+          <label class="control">
+            Horizontal FOV (deg)
+            <input id="horizontal-fov" type="number" min="10" max="180" step="0.1">
+          </label>
+          <label class="check">
+            <input id="vertical-fov-auto" type="checkbox">
+            Auto vertical FOV
+          </label>
+          <label class="control">
+            Vertical FOV (deg)
+            <input id="vertical-fov" type="number" min="5" max="160" step="0.1">
+          </label>
+          <div class="button-row">
+            <button id="save-calibration" type="button">Save calibration</button>
+            <button id="cancel-calibration" type="button">Cancel</button>
+          </div>
+        </div>
+        <div class="meta" id="calibration-status"></div>
+      </section>
     </aside>
   </main>
 
@@ -185,14 +369,69 @@
     const updatedEl = document.getElementById('updated');
     const countEl = document.getElementById('count');
     const list = document.getElementById('list');
+    const cameraHeightInput = document.getElementById('camera-height');
+    const horizontalFovInput = document.getElementById('horizontal-fov');
+    const verticalFovAutoInput = document.getElementById('vertical-fov-auto');
+    const verticalFovInput = document.getElementById('vertical-fov');
+    const centerLine = document.getElementById('center-line');
+    const horizonLine = document.getElementById('horizon-line');
+    const startCalibrationButton = document.getElementById('start-calibration');
+    const saveCalibrationButton = document.getElementById('save-calibration');
+    const cancelCalibrationButton = document.getElementById('cancel-calibration');
+    const calibrationStatus = document.getElementById('calibration-status');
     const API_BASE = '/plugins/signalk-forward-watch/api';
 
     let lastFrameVersion = null;
+    let frameRatio = 16 / 9;
+    let calibration = null;
+    let draggingCalibration = null;
 
     frame.addEventListener('load', () => {
       if (!frame.naturalWidth || !frame.naturalHeight) return;
-      stage.style.setProperty('--frame-ratio', String(frame.naturalWidth / frame.naturalHeight));
+      frameRatio = frame.naturalWidth / frame.naturalHeight;
+      stage.style.setProperty('--frame-ratio', String(frameRatio));
       stage.style.setProperty('--frame-aspect', `${frame.naturalWidth} / ${frame.naturalHeight}`);
+      if (calibration?.camera_vertical_fov_auto) {
+        calibration.frame_aspect = frameRatio;
+        calibration.camera_vertical_fov_deg = calculateVerticalFov(calibration.camera_horizontal_fov_deg, frameRatio);
+        updateCalibrationForm();
+      }
+    });
+
+    startCalibrationButton.addEventListener('click', () => setCalibrating(true));
+    cancelCalibrationButton.addEventListener('click', () => setCalibrating(false));
+    saveCalibrationButton.addEventListener('click', saveCalibration);
+    verticalFovAutoInput.addEventListener('change', () => {
+      calibration = readCalibrationForm();
+      updateCalibrationForm();
+      renderCalibrationLines();
+    });
+    horizontalFovInput.addEventListener('input', () => {
+      if (!verticalFovAutoInput.checked) return;
+      calibration = readCalibrationForm();
+      updateCalibrationForm();
+    });
+
+    stage.addEventListener('pointerdown', (event) => {
+      if (!document.body.classList.contains('calibrating')) return;
+      const type = event.target.dataset.calibrationType || nearestCalibrationLine(event);
+      if (!type) return;
+      draggingCalibration = type;
+      stage.setPointerCapture(event.pointerId);
+      updateCalibrationPoint(event, type);
+    });
+
+    stage.addEventListener('pointermove', (event) => {
+      if (!draggingCalibration) return;
+      updateCalibrationPoint(event, draggingCalibration);
+    });
+
+    stage.addEventListener('pointerup', () => {
+      draggingCalibration = null;
+    });
+
+    stage.addEventListener('pointercancel', () => {
+      draggingCalibration = null;
     });
 
     async function refresh() {
@@ -253,6 +492,109 @@
       overlay.appendChild(box);
     }
 
+    async function loadCalibration() {
+      try {
+        const response = await fetch(`${API_BASE}/calibration`, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        calibration = await response.json();
+        updateCalibrationForm();
+        renderCalibrationLines();
+      } catch (error) {
+        calibrationStatus.textContent = `Calibration: ${error.message}`;
+      }
+    }
+
+    async function saveCalibration() {
+      try {
+        const body = Object.assign(readCalibrationForm(), {
+          calibrated: true,
+          frame_aspect: frameRatio
+        });
+        const response = await fetch(`${API_BASE}/calibration`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        calibration = await response.json();
+        updateCalibrationForm();
+        renderCalibrationLines();
+        calibrationStatus.textContent = 'Calibration saved';
+        setCalibrating(false);
+      } catch (error) {
+        calibrationStatus.textContent = `Calibration: ${error.message}`;
+      }
+    }
+
+    function updateCalibrationForm() {
+      if (!calibration) return;
+      cameraHeightInput.value = round(calibration.camera_height_m, 2);
+      horizontalFovInput.value = round(calibration.camera_horizontal_fov_deg, 1);
+      verticalFovAutoInput.checked = calibration.camera_vertical_fov_auto !== false;
+      verticalFovInput.disabled = verticalFovAutoInput.checked;
+
+      if (verticalFovAutoInput.checked) {
+        calibration.camera_vertical_fov_deg = calculateVerticalFov(calibration.camera_horizontal_fov_deg, frameRatio);
+      }
+      verticalFovInput.value = round(calibration.camera_vertical_fov_deg, 1);
+    }
+
+    function readCalibrationForm() {
+      const current = calibration || {};
+      const next = {
+        calibrated: current.calibrated === true,
+        camera_height_m: readNumber(cameraHeightInput, current.camera_height_m || 2),
+        camera_horizontal_fov_deg: readNumber(horizontalFovInput, current.camera_horizontal_fov_deg || 60),
+        camera_vertical_fov_auto: verticalFovAutoInput.checked,
+        camera_vertical_fov_deg: readNumber(verticalFovInput, current.camera_vertical_fov_deg || 34),
+        camera_center_x: current.camera_center_x ?? 0.5,
+        camera_horizon_y: current.camera_horizon_y ?? 0.5,
+        frame_aspect: frameRatio
+      };
+      if (next.camera_vertical_fov_auto) {
+        next.camera_vertical_fov_deg = calculateVerticalFov(next.camera_horizontal_fov_deg, frameRatio);
+      }
+      return next;
+    }
+
+    function renderCalibrationLines() {
+      if (!calibration) return;
+      centerLine.style.left = `${clamp(calibration.camera_center_x, 0, 1) * 100}%`;
+      horizonLine.style.top = `${clamp(calibration.camera_horizon_y, 0, 1) * 100}%`;
+    }
+
+    function setCalibrating(enabled) {
+      document.body.classList.toggle('calibrating', enabled);
+      startCalibrationButton.textContent = enabled ? 'Calibration active' : 'Calibrate camera';
+      if (!enabled) draggingCalibration = null;
+    }
+
+    function updateCalibrationPoint(event, type) {
+      if (!calibration) return;
+      calibration = readCalibrationForm();
+      const rect = stage.getBoundingClientRect();
+      if (type === 'center') {
+        calibration.camera_center_x = clamp((event.clientX - rect.left) / rect.width, 0, 1);
+      } else if (type === 'horizon') {
+        calibration.camera_horizon_y = clamp((event.clientY - rect.top) / rect.height, 0, 1);
+      }
+      renderCalibrationLines();
+      calibrationStatus.textContent = 'Calibration changed';
+    }
+
+    function nearestCalibrationLine(event) {
+      if (!calibration) return null;
+      const rect = stage.getBoundingClientRect();
+      const x = (event.clientX - rect.left) / rect.width;
+      const y = (event.clientY - rect.top) / rect.height;
+      const centerDistance = Math.abs(x - calibration.camera_center_x);
+      const horizonDistance = Math.abs(y - calibration.camera_horizon_y);
+      return centerDistance <= horizonDistance ? 'center' : 'horizon';
+    }
+
+    centerLine.dataset.calibrationType = 'center';
+    horizonLine.dataset.calibrationType = 'horizon';
+
     function renderListItem(detection) {
       const item = document.createElement('div');
       item.className = 'item';
@@ -299,6 +641,23 @@
       return Math.max(min, Math.min(max, value));
     }
 
+    function readNumber(input, fallback) {
+      const number = Number(input.value);
+      return Number.isFinite(number) ? number : fallback;
+    }
+
+    function round(value, decimals) {
+      const factor = 10 ** decimals;
+      return Math.round(value * factor) / factor;
+    }
+
+    function calculateVerticalFov(horizontalFovDeg, aspect) {
+      const horizontalFovRad = horizontalFovDeg * Math.PI / 180;
+      const verticalFovRad = 2 * Math.atan(Math.tan(horizontalFovRad / 2) / aspect);
+      return Math.round((verticalFovRad * 180 / Math.PI) * 10) / 10;
+    }
+
+    loadCalibration();
     refresh();
     setInterval(refresh, 1000);
   </script>
