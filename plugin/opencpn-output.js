@@ -21,6 +21,9 @@ class OpenCPNOutput {
     );
 
     for (const d of targets) {
+      const staticValue = {
+        name: `${d.ais.label} (${Math.round(d.confidence * 100)}%)`
+      };
       const values = [
         {
           path: 'navigation.position',
@@ -30,52 +33,41 @@ class OpenCPNOutput {
           }
         },
         {
-          path: 'name',
-          value: `${d.ais.label} (${Math.round(d.confidence * 100)}%)`
+          path: '',
+          value: staticValue
         }
       ];
 
       if (this.isNmeaExportCompatEnabled()) {
         const staticData = getAisStaticData(d);
-        values.push(
-          {
-            path: 'sensors.ais.class',
-            value: 'B'
+        Object.assign(staticValue, {
+          mmsi: String(d.ais.mmsi),
+          communication: {
+            callsignVhf: getCallSign(d.ais.mmsi)
           },
-          {
-            path: 'navigation.speedOverGround',
-            value: 0
-          },
-          {
-            path: 'communication',
-            value: {
-              callsignVhf: getCallSign(d.ais.mmsi)
-            }
-          },
-          {
-            path: 'design.aisShipType',
-            value: {
+          design: {
+            aisShipType: {
               id: staticData.typeId,
               name: staticData.typeName
-            }
-          },
-          {
-            path: 'design.beam',
-            value: staticData.beam
-          },
-          {
-            path: 'design.length',
-            value: {
+            },
+            beam: staticData.beam,
+            length: {
               overall: staticData.length
             }
           },
+          sensors: {
+            ais: {
+              class: 'B',
+              fromBow: staticData.fromBow,
+              fromCenter: staticData.fromCenter
+            }
+          }
+        });
+
+        values.push(
           {
-            path: 'sensors.ais.fromBow',
-            value: staticData.fromBow
-          },
-          {
-            path: 'sensors.ais.fromCenter',
-            value: staticData.fromCenter
+            path: 'navigation.speedOverGround',
+            value: 0
           }
         );
       }
