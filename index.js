@@ -8,6 +8,7 @@ const GpsCalculator = require('./plugin/gps-calculator');
 const SignalkOutput = require('./plugin/signalk-output');
 const OpenCPNOutput = require('./plugin/opencpn-output');
 const { assignTargetSlots } = require('./plugin/target-slots');
+const { getAisStaticData } = require('./plugin/ais-target-data');
 const { DEFAULT_CALIBRATION, normalizeCalibration } = require('./plugin/calibration');
 
 const MODEL_PATH = path.join(__dirname, 'models', 'forward-watch.onnx');
@@ -238,11 +239,14 @@ module.exports = function(app) {
           );
           const visibleDetections = enriched.map(d => {
             const target = targetByDetection.get(d);
+            const aisStaticData = d.position ? getAisStaticData(d) : null;
             return Object.assign({}, d, target ? {
               ais: {
                 context: target.context,
                 label: target.label,
-                mmsi: target.mmsi
+                mmsi: target.mmsi,
+                length: aisStaticData ? aisStaticData.length : null,
+                beam: aisStaticData ? aisStaticData.beam : null
               }
             } : {});
           });

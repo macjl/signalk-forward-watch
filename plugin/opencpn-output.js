@@ -2,17 +2,7 @@
 // OpenCPN reads them via its existing Signal K connection and displays them as AIS targets
 
 const { assignTargetSlots } = require('./target-slots');
-
-const AIS_STATIC_DATA = {
-  ship:   { typeId: 70, length: 80, beamRatio: 0.15, minLength: 20, maxLength: 200 },
-  boat:   { typeId: 37, length: 12, beamRatio: 0.33, minLength: 3, maxLength: 30 },
-  debris: { typeId: 99, length: 1, beamRatio: 1, minLength: 1, maxLength: 10 },
-  buoy:   { typeId: 99, length: 1, beamRatio: 1, minLength: 1, maxLength: 10 },
-  kayak:  { typeId: 37, length: 4, beamRatio: 0.25, minLength: 2, maxLength: 6 },
-  log:    { typeId: 99, length: 2, beamRatio: 0.5, minLength: 1, maxLength: 12 }
-};
-const HORIZONTAL_FOV_DEG = 60;
-const SIDE_VIEW_ASPECT_RATIO = 1.4;
+const { getAisStaticData } = require('./ais-target-data');
 
 const PLUGIN_ID = 'signalk-forward-watch';
 const CLEAR_VALUES = [
@@ -138,61 +128,6 @@ class OpenCPNOutput {
   isNmeaExportCompatEnabled() {
     return this.options.ais_nmea_export_compat === true;
   }
-}
-
-function getAisStaticData(detection) {
-  const defaults = AIS_STATIC_DATA[detection.class_name] || AIS_STATIC_DATA.boat;
-  const apparentWidth = getApparentWidth(detection);
-  const isSideView = getDetectionAspectRatio(detection) >= SIDE_VIEW_ASPECT_RATIO;
-  const estimatedLength = apparentWidth === null
-    ? defaults.length
-    : isSideView
-      ? apparentWidth
-      : apparentWidth / defaults.beamRatio;
-
-  const length = roundMetres(clamp(estimatedLength, defaults.minLength, defaults.maxLength));
-  const beam = roundMetres(clamp(length * defaults.beamRatio, Math.min(2, length), length));
-
-  return {
-    typeId: defaults.typeId,
-    length,
-    beam
-  };
-}
-
-function getApparentWidth(detection) {
-  if (
-    typeof detection.distance !== 'number' ||
-    typeof detection.w !== 'number'
-  ) {
-    return null;
-  }
-
-  const defaults = AIS_STATIC_DATA[detection.class_name] || AIS_STATIC_DATA.boat;
-  const angularWidthRad = Math.max(0, detection.w) * HORIZONTAL_FOV_DEG * (Math.PI / 180);
-  const apparentWidth = 2 * detection.distance * Math.tan(angularWidthRad / 2);
-  if (!Number.isFinite(apparentWidth) || apparentWidth <= 0) return null;
-  return clamp(apparentWidth, defaults.minLength * defaults.beamRatio, defaults.maxLength);
-}
-
-function getDetectionAspectRatio(detection) {
-  if (
-    typeof detection.w !== 'number' ||
-    typeof detection.h !== 'number' ||
-    detection.h <= 0
-  ) {
-    return SIDE_VIEW_ASPECT_RATIO;
-  }
-
-  return detection.w / detection.h;
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
-
-function roundMetres(value) {
-  return Math.max(1, Math.round(value));
 }
 
 function getCallSign(mmsi) {
