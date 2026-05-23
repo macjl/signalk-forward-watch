@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const CONTAINER_NAME = 'forward-watch-ffmpeg';
-const CONFIG_ROOT_MOUNT = '/signalk-config';
+const DATA_MOUNT = '/signalk-data';
 const FRAME_FILE = 'latest.jpg';
 const PLUGIN_VERSION = require('../package.json').version;
 
@@ -11,7 +11,8 @@ class ContainerRtspGrabber {
     this.app = app;
     this.options = options || {};
     this.containers = null;
-    this.frameDir = path.join(app.getDataDirPath(), 'frames');
+    this.dataDir = app.getDataDirPath();
+    this.frameDir = path.join(this.dataDir, 'frames');
     this.framePath = path.join(this.frameDir, FRAME_FILE);
     this.frameMaxAgeMs = Math.max((this.options.detection_interval || 1) * 3000, 10000);
     this.started = false;
@@ -88,19 +89,14 @@ class ContainerRtspGrabber {
   }
 
   async resolveFrameMount() {
-    const configPath = this.app.config && this.app.config.configPath;
-    if (!configPath) {
-      throw new Error('Signal K config root is unavailable; container FFmpeg mode requires app.config.configPath');
-    }
-
-    const relativeFramePath = path.relative(configPath, this.framePath);
+    const relativeFramePath = path.relative(this.dataDir, this.framePath);
     if (!relativeFramePath || relativeFramePath.startsWith('..') || path.isAbsolute(relativeFramePath)) {
-      throw new Error(`Forward Watch frame path is outside the Signal K config root: ${this.framePath}`);
+      throw new Error(`Forward Watch frame path is outside the plugin data directory: ${this.framePath}`);
     }
 
     return {
-      config: { signalkConfigRootMount: CONFIG_ROOT_MOUNT },
-      containerFramePath: path.posix.join(CONFIG_ROOT_MOUNT, toPosix(relativeFramePath))
+      config: { signalkDataMount: DATA_MOUNT },
+      containerFramePath: path.posix.join(DATA_MOUNT, toPosix(relativeFramePath))
     };
   }
 
