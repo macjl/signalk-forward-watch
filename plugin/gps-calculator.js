@@ -27,14 +27,14 @@ class GpsCalculator {
   // detection: {cx, cy, w, h, class_name, confidence} (cx/cy/w/h normalized 0-1)
   // boatLat/boatLon: decimal degrees (null if no GPS)
   // boatHeading: degrees true
-  calculate(detection, boatLat, boatLon, boatHeading, calibrationInput) {
+  calculate(detection, boatLat, boatLon, boatHeading, calibrationInput, attitudeInput) {
     if (boatLat === null || boatLon === null) return null;
     const calibration = normalizeCalibration(calibrationInput, DEFAULT_CALIBRATION);
 
     let distance_m;
     if (calibration.calibrated) {
       const targetY = Math.max(0, Math.min(1, detection.cy + detection.h / 2));
-      const horizonY = horizonAtX(detection.cx, calibration);
+      const horizonY = horizonAtX(detection.cx, calibration, attitudeInput);
       const verticalAngleDeg = (targetY - horizonY) * calibration.camera_vertical_fov_deg;
       const verticalAngleRad = Math.max(0.1, verticalAngleDeg) * Math.PI / 180;
       distance_m = Math.max(2, Math.min(500, calibration.camera_height_m / Math.tan(verticalAngleRad)));
@@ -62,11 +62,23 @@ class GpsCalculator {
   }
 }
 
-function horizonAtX(x, calibration) {
+function horizonAtX(x, calibration, attitude) {
   const centerX = Math.max(0, Math.min(1, calibration.camera_center_x));
+  const clampedX = Math.max(0, Math.min(1, x));
   const span = Math.max(centerX, 1 - centerX, 0.001);
-  const normalizedX = (Math.max(0, Math.min(1, x)) - centerX) / span;
-  return Math.max(0, Math.min(1, calibration.camera_horizon_y + (calibration.camera_horizon_curve * normalizedX * normalizedX)));
+  const normalizedX = (clampedX - centerX) / span;
+  const pitchOffset = attitude ? radiansToDegrees(attitude.pitch || 0) / calibration.camera_vertical_fov_deg : 0;
+  const rollOffset = attitude ? Math.tan(attitude.roll || 0) * (clampedX - centerX) * calibration.frame_aspect : 0;
+  const horizonY = calibration.camera_horizon_y +
+    (calibration.camera_horizon_curve * normalizedX * normalizedX) +
+    pitchOffset +
+    rollOffset;
+
+  return Math.max(0, Math.min(1, horizonY));
+}
+
+function radiansToDegrees(value) {
+  return value * 180 / Math.PI;
 }
 
 module.exports = GpsCalculator;

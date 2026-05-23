@@ -78,6 +78,12 @@ module.exports = function(app) {
           minimum: 0,
           maximum: 1
         },
+        attitude_correction_enabled: {
+          type: 'boolean',
+          title: 'Apply navigation.attitude correction to camera calibration',
+          description: 'When enabled, roll and pitch from navigation.attitude are used to adjust the calibrated horizon for vessel heel and trim.',
+          default: false
+        },
         opencpn_enabled: {
           type: 'boolean',
           title: 'Show detections in OpenCPN',
@@ -218,10 +224,11 @@ module.exports = function(app) {
           const boatLon = app.getSelfPath('navigation.position.value.longitude') || null;
           const headingTrue = app.getSelfPath('navigation.headingTrue.value');
           const boatHeading = typeof headingTrue === 'number' ? radiansToDegrees(headingTrue) : 0;
+          const attitude = options.attitude_correction_enabled ? getNavigationAttitude(app) : null;
 
           // Enrich detections with GPS position
           const enriched = detections.map(d => {
-            const gps = this.gpsCalc.calculate(d, boatLat, boatLon, boatHeading, this.calibration);
+            const gps = this.gpsCalc.calculate(d, boatLat, boatLon, boatHeading, this.calibration, attitude);
             return Object.assign({}, d, gps ? {
               position: { latitude: gps.lat, longitude: gps.lon },
               distance: gps.distance_m,
@@ -311,6 +318,21 @@ function redactRtspUrl(rtspUrl) {
 
 function radiansToDegrees(value) {
   return value * 180 / Math.PI;
+}
+
+function getNavigationAttitude(app) {
+  const attitude = app.getSelfPath('navigation.attitude.value');
+  const roll = attitude && typeof attitude === 'object'
+    ? attitude.roll
+    : app.getSelfPath('navigation.attitude.value.roll');
+  const pitch = attitude && typeof attitude === 'object'
+    ? attitude.pitch
+    : app.getSelfPath('navigation.attitude.value.pitch');
+
+  return {
+    roll: typeof roll === 'number' ? roll : 0,
+    pitch: typeof pitch === 'number' ? pitch : 0
+  };
 }
 
 function getFrameVersion(framePath) {

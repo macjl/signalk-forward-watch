@@ -272,9 +272,10 @@ A Signal K notification is sent for any detection **within 100m**. One notificat
 **Distance estimates seem wrong**
 - This is expected. Monocular depth estimation from a single camera is inherently imprecise. Use as a rough guide only.
 - Accuracy improves for larger objects that fill more of the frame.
+- If your vessel publishes `navigation.attitude`, enable attitude correction to adjust the calibrated horizon for heel and trim.
 
 **No GPS position in detections**
-- The plugin reads `navigation.position` and `navigation.headingTrue` from Signal K.
+- The plugin reads `navigation.position` and `navigation.headingTrue` from Signal K. When attitude correction is enabled, it also reads `navigation.attitude`.
 - If your GPS isn't providing position data, detections will still appear but without `position`, `distance`, and `bearing` fields.
 
 ---
