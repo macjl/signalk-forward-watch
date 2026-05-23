@@ -1,10 +1,10 @@
 const AIS_STATIC_DATA = {
-  ship:   { typeId: 70, length: 80, beamRatio: 0.15, maxLength: 200 },
-  boat:   { typeId: 37, length: 12, beamRatio: 0.33, maxLength: 30 },
-  debris: { typeId: 99, length: 1, beamRatio: 1, maxLength: 10 },
-  buoy:   { typeId: 99, length: 1, beamRatio: 1, maxLength: 10 },
-  kayak:  { typeId: 37, length: 4, beamRatio: 0.25, maxLength: 6 },
-  log:    { typeId: 99, length: 2, beamRatio: 0.5, maxLength: 12 }
+  ship:   { typeId: 70, typeName: 'Cargo', length: 80, beamRatio: 0.15, maxLength: 200 },
+  boat:   { typeId: 37, typeName: 'Pleasure Craft', length: 12, beamRatio: 0.33, maxLength: 30 },
+  debris: { typeId: 99, typeName: 'Other', length: 1, beamRatio: 1, maxLength: 10 },
+  buoy:   { typeId: 99, typeName: 'Other', length: 1, beamRatio: 1, maxLength: 10 },
+  kayak:  { typeId: 37, typeName: 'Pleasure Craft', length: 4, beamRatio: 0.25, maxLength: 6 },
+  log:    { typeId: 99, typeName: 'Other', length: 2, beamRatio: 0.5, maxLength: 12 }
 };
 
 const SIDE_VIEW_ASPECT_RATIO = 1.4;
@@ -24,8 +24,11 @@ function getAisStaticData(detection) {
 
   return {
     typeId: defaults.typeId,
+    typeName: defaults.typeName,
     length,
-    beam
+    beam,
+    fromBow: Math.max(0, Math.round(length / 2)),
+    fromCenter: 0
   };
 }
 

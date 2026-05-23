@@ -37,39 +37,49 @@ class OpenCPNOutput {
 
       if (this.isNmeaExportCompatEnabled()) {
         const staticData = getAisStaticData(d);
-        const crossingHeading = getCrossingHeading(d);
         values.push(
           {
             path: 'sensors.ais.class',
             value: 'B'
           },
           {
-            path: 'navigation.courseOverGroundTrue',
-            value: degreesToRadians(crossingHeading)
-          },
-          {
-            path: 'navigation.headingTrue',
-            value: degreesToRadians(crossingHeading)
-          },
-          {
             path: 'navigation.speedOverGround',
             value: 0
           },
           {
-            path: 'communication.callsignVhf',
-            value: getCallSign(d.ais.mmsi)
+            path: 'mmsi',
+            value: String(d.ais.mmsi)
           },
           {
-            path: 'design.aisShipType.id',
-            value: staticData.typeId
+            path: 'communication',
+            value: {
+              callsignVhf: getCallSign(d.ais.mmsi)
+            }
           },
           {
-            path: 'design.length.overall',
-            value: staticData.length
+            path: 'design.aisShipType',
+            value: {
+              id: staticData.typeId,
+              name: staticData.typeName
+            }
           },
           {
             path: 'design.beam',
             value: staticData.beam
+          },
+          {
+            path: 'design.length',
+            value: {
+              overall: staticData.length
+            }
+          },
+          {
+            path: 'sensors.ais.fromBow',
+            value: staticData.fromBow
+          },
+          {
+            path: 'sensors.ais.fromCenter',
+            value: staticData.fromCenter
           }
         );
       }
@@ -97,16 +107,6 @@ class OpenCPNOutput {
 
 function getCallSign(mmsi) {
   return `FW${String(mmsi).slice(-5)}`;
-}
-
-function getCrossingHeading(detection) {
-  const bearing = typeof detection.bearing === 'number' ? detection.bearing : 0;
-  const turn = typeof detection.cx === 'number' && detection.cx > 0.5 ? -90 : 90;
-  return (bearing + turn + 360) % 360;
-}
-
-function degreesToRadians(degrees) {
-  return degrees * Math.PI / 180;
 }
 
 module.exports = OpenCPNOutput;
