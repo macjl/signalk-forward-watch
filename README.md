@@ -117,7 +117,7 @@ The final MMSI digit identifies the detection class, preserving the original sin
 
 Forward Watch clears virtual AIS targets that are no longer detected on the next detection cycle. It removes only the Signal K paths it publishes for its own fake MMSI contexts, so the chart stays aligned with the current AI detections.
 
-NMEA AIS export compatibility is disabled by default. When enabled, Forward Watch uses the MMSI embedded in each virtual vessel context and publishes only the fields needed by converter plugins such as `signalk-vessels-to-ais`: `name`, `sensors.ais.class = B`, synthetic crossing `navigation.courseOverGroundTrue`, `navigation.headingTrue`, `navigation.speedOverGround = 0`, `communication.callsignVhf`, `design.aisShipType.id`, `design.length.overall`, and `design.beam`. The synthetic course assumes the target is crossing own vessel's track: targets on port or centered use `bearing + 90°`, targets on starboard use `bearing - 90°`. Dimensions are estimated from the detected box width, estimated distance, and the plugin's horizontal FOV assumption; wide boxes are treated as a side view where box width approximates vessel length, while squarer boxes are treated as a bow/stern view where box width approximates beam. These generated virtual targets must not be forwarded to public AIS networks such as MarineTraffic or AIS Hub.
+NMEA AIS export compatibility is disabled by default. When enabled, Forward Watch uses the MMSI embedded in each virtual vessel context and publishes only the fields needed by converter plugins such as `signalk-vessels-to-ais`: `name`, `sensors.ais.class = B`, synthetic crossing `navigation.courseOverGroundTrue`, `navigation.headingTrue`, `navigation.speedOverGround = 0`, `communication.callsignVhf`, `design.aisShipType.id`, `design.length.overall`, and `design.beam`. The synthetic course assumes the target is crossing own vessel's track: targets on port or centered use `bearing + 90°`, targets on starboard use `bearing - 90°`. Box dimensions are first estimated from the detected box size, estimated distance, and calibrated camera FOV; AIS dimensions are then inferred from those box dimensions. Wide boxes are treated as a side view where box width approximates vessel length, while squarer boxes are treated as a bow/stern view where box width approximates beam. These generated virtual targets must not be forwarded to public AIS networks such as MarineTraffic or AIS Hub.
 
 ### OpenCPN (Signal K connection)
 
@@ -185,11 +185,13 @@ Updated every detection interval. Always present — empty array `[]` when nothi
 | `h` | number | Bounding box height as fraction of image height |
 | `distance` | number | Estimated distance in metres (monocular estimate — larger object in frame = closer) |
 | `bearing` | number | Estimated bearing in degrees true |
+| `dimensions.width` | number | Estimated physical width of the detected image box in metres |
+| `dimensions.height` | number | Estimated physical height of the detected image box in metres |
 | `quadrant` | string | `port` (left half of frame) or `starboard` (right half of frame) |
 | `position.latitude` | number | Estimated GPS latitude of the object (requires boat GPS in Signal K) |
 | `position.longitude` | number | Estimated GPS longitude of the object (requires boat GPS in Signal K) |
 
-> **Note on distance accuracy:** Distance is estimated from bounding box height using a monocular depth formula. It assumes a ~60° horizontal field of view. Accuracy is ±50% — treat it as a rough range indicator, not a precise measurement. A proper rangefinder integration would improve this.
+> **Note on distance accuracy:** Distance is estimated from a monocular camera model using the saved calibration. Accuracy is still approximate — treat it as a rough range indicator, not a precise measurement. A proper rangefinder integration would improve this.
 
 ---
 

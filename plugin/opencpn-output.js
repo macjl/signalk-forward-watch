@@ -25,7 +25,7 @@ class OpenCPNOutput {
     this.activeContexts = new Set();
   }
 
-  sendDetections(detections, calibration) {
+  sendDetections(detections) {
     const withPos = detections.filter(d =>
       d.position &&
       typeof d.position.latitude === 'number' &&
@@ -52,7 +52,7 @@ class OpenCPNOutput {
       ];
 
       if (this.isNmeaExportCompatEnabled()) {
-        const staticData = getAisStaticData(d, calibration);
+        const staticData = getAisStaticData(d);
         const crossingHeading = getCrossingHeading(d);
         values.push(
           {

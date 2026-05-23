@@ -9,6 +9,7 @@ const SignalkOutput = require('./plugin/signalk-output');
 const OpenCPNOutput = require('./plugin/opencpn-output');
 const { assignTargetSlots } = require('./plugin/target-slots');
 const { getAisStaticData } = require('./plugin/ais-target-data');
+const { getDetectionDimensions } = require('./plugin/detection-geometry');
 const { DEFAULT_CALIBRATION, normalizeCalibration } = require('./plugin/calibration');
 
 const MODEL_PATH = path.join(__dirname, 'models', 'forward-watch.onnx');
@@ -234,10 +235,12 @@ module.exports = function(app) {
           // Enrich detections with GPS position
           const enriched = detections.map(d => {
             const gps = this.gpsCalc.calculate(d, boatLat, boatLon, boatHeading, this.calibration, attitude);
+            const base = Object.assign({}, d, gps ? { distance: gps.distance_m } : {});
             return Object.assign({}, d, gps ? {
               position: { latitude: gps.lat, longitude: gps.lon },
               distance: gps.distance_m,
               bearing: gps.bearing_deg,
+              dimensions: getDetectionDimensions(base, this.calibration),
               quadrant: d.cx < 0.5 ? 'port' : 'starboard'
             } : {});
           });
@@ -251,7 +254,7 @@ module.exports = function(app) {
           );
           const visibleDetections = enriched.map(d => {
             const target = targetByDetection.get(d);
-            const aisStaticData = d.position ? getAisStaticData(d, this.calibration) : null;
+            const aisStaticData = d.position ? getAisStaticData(d) : null;
             return Object.assign({}, d, target ? {
               ais: {
                 context: target.context,
@@ -269,7 +272,7 @@ module.exports = function(app) {
           this.latestDetections = visibleDetections;
 
           this.skOutput.sendDetections(enriched);
-          if (options.opencpn_enabled !== false) this.ocpnOutput.sendDetections(enriched, this.calibration);
+          if (options.opencpn_enabled !== false) this.ocpnOutput.sendDetections(enriched);
         } catch (err) {
           app.debug('Detection loop error: ' + err.message);
         } finally {
