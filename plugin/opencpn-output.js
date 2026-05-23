@@ -24,14 +24,15 @@ const CLASS_LABEL = {
 };
 
 const AIS_STATIC_DATA = {
-  ship:   { typeId: 70, typeName: 'Cargo', length: 80, beamRatio: 0.15, minLength: 20, maxLength: 200 },
-  boat:   { typeId: 37, typeName: 'Pleasure Craft', length: 12, beamRatio: 0.33, minLength: 3, maxLength: 30 },
-  debris: { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10 },
-  buoy:   { typeId: 99, typeName: 'Other Type', length: 1, beamRatio: 1, minLength: 1, maxLength: 10 },
-  kayak:  { typeId: 37, typeName: 'Pleasure Craft', length: 4, beamRatio: 0.25, minLength: 2, maxLength: 6 },
-  log:    { typeId: 99, typeName: 'Other Type', length: 2, beamRatio: 0.5, minLength: 1, maxLength: 12 }
+  ship:   { typeId: 70, length: 80, beamRatio: 0.15, minLength: 20, maxLength: 200 },
+  boat:   { typeId: 37, length: 12, beamRatio: 0.33, minLength: 3, maxLength: 30 },
+  debris: { typeId: 99, length: 1, beamRatio: 1, minLength: 1, maxLength: 10 },
+  buoy:   { typeId: 99, length: 1, beamRatio: 1, minLength: 1, maxLength: 10 },
+  kayak:  { typeId: 37, length: 4, beamRatio: 0.25, minLength: 2, maxLength: 6 },
+  log:    { typeId: 99, length: 2, beamRatio: 0.5, minLength: 1, maxLength: 12 }
 };
 const HORIZONTAL_FOV_DEG = 60;
+const SIDE_VIEW_ASPECT_RATIO = 1.4;
 
 const PLUGIN_ID = 'signalk-forward-watch';
 const CLEAR_VALUES = [
@@ -43,13 +44,8 @@ const CLEAR_VALUES = [
   { path: 'navigation.speedOverGround', value: null },
   { path: 'communication.callsignVhf', value: null },
   { path: 'design.aisShipType.id', value: null },
-  { path: 'design.aisShipType.name', value: null },
   { path: 'design.length.overall', value: null },
-  { path: 'design.beam', value: null },
-  { path: 'sensors.ais.fromBow', value: null },
-  { path: 'sensors.ais.toStern', value: null },
-  { path: 'sensors.ais.fromCenter', value: null },
-  { path: 'sensors.ais.toPort', value: null }
+  { path: 'design.beam', value: null }
 ];
 
 class OpenCPNOutput {
@@ -114,32 +110,12 @@ class OpenCPNOutput {
             value: staticData.typeId
           },
           {
-            path: 'design.aisShipType.name',
-            value: staticData.typeName
-          },
-          {
             path: 'design.length.overall',
             value: staticData.length
           },
           {
             path: 'design.beam',
             value: staticData.beam
-          },
-          {
-            path: 'sensors.ais.fromBow',
-            value: staticData.fromBow
-          },
-          {
-            path: 'sensors.ais.toStern',
-            value: staticData.toStern
-          },
-          {
-            path: 'sensors.ais.fromCenter',
-            value: 0
-          },
-          {
-            path: 'sensors.ais.toPort',
-            value: staticData.toPort
           }
         );
       }
@@ -186,31 +162,49 @@ class OpenCPNOutput {
 
 function getAisStaticData(detection) {
   const defaults = AIS_STATIC_DATA[detection.class_name] || AIS_STATIC_DATA.boat;
-  let estimatedLength = defaults.length;
+  const apparentWidth = getApparentWidth(detection);
+  const isSideView = getDetectionAspectRatio(detection) >= SIDE_VIEW_ASPECT_RATIO;
+  const estimatedLength = apparentWidth === null
+    ? defaults.length
+    : isSideView
+      ? apparentWidth
+      : apparentWidth / defaults.beamRatio;
 
-  if (
-    typeof detection.distance === 'number' &&
-    typeof detection.w === 'number'
-  ) {
-    const angularWidthRad = Math.max(0, detection.w) * HORIZONTAL_FOV_DEG * (Math.PI / 180);
-    const apparentWidth = 2 * detection.distance * Math.tan(angularWidthRad / 2);
-    if (Number.isFinite(apparentWidth) && apparentWidth > 0) {
-      estimatedLength = clamp(apparentWidth, defaults.minLength, defaults.maxLength);
-    }
-  }
-
-  const length = roundMetres(estimatedLength);
+  const length = roundMetres(clamp(estimatedLength, defaults.minLength, defaults.maxLength));
   const beam = roundMetres(clamp(length * defaults.beamRatio, Math.min(2, length), length));
 
   return {
     typeId: defaults.typeId,
-    typeName: defaults.typeName,
     length,
-    beam,
-    fromBow: Math.max(0, Math.round(length / 2)),
-    toStern: Math.max(0, length - Math.round(length / 2)),
-    toPort: Math.max(0, beam)
+    beam
   };
+}
+
+function getApparentWidth(detection) {
+  if (
+    typeof detection.distance !== 'number' ||
+    typeof detection.w !== 'number'
+  ) {
+    return null;
+  }
+
+  const defaults = AIS_STATIC_DATA[detection.class_name] || AIS_STATIC_DATA.boat;
+  const angularWidthRad = Math.max(0, detection.w) * HORIZONTAL_FOV_DEG * (Math.PI / 180);
+  const apparentWidth = 2 * detection.distance * Math.tan(angularWidthRad / 2);
+  if (!Number.isFinite(apparentWidth) || apparentWidth <= 0) return null;
+  return clamp(apparentWidth, defaults.minLength * defaults.beamRatio, defaults.maxLength);
+}
+
+function getDetectionAspectRatio(detection) {
+  if (
+    typeof detection.w !== 'number' ||
+    typeof detection.h !== 'number' ||
+    detection.h <= 0
+  ) {
+    return SIDE_VIEW_ASPECT_RATIO;
+  }
+
+  return detection.w / detection.h;
 }
 
 function clamp(value, min, max) {
