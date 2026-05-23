@@ -8,6 +8,8 @@ const AIS_STATIC_DATA = {
 };
 
 const SIDE_VIEW_ASPECT_RATIO = 1.4;
+const MIN_AIS_LENGTH = 2;
+const MIN_AIS_BEAM = 2;
 
 function getAisStaticData(detection) {
   const defaults = AIS_STATIC_DATA[detection.class_name] || AIS_STATIC_DATA.boat;
@@ -19,8 +21,8 @@ function getAisStaticData(detection) {
       ? apparentWidth
       : apparentWidth / defaults.beamRatio;
 
-  const length = roundMetres(clamp(estimatedLength, 0, defaults.maxLength));
-  const beam = roundMetres(clamp(length * defaults.beamRatio, 0, length));
+  const length = roundMetres(clamp(estimatedLength, MIN_AIS_LENGTH, defaults.maxLength));
+  const beam = roundMetres(clamp(length * defaults.beamRatio, Math.min(MIN_AIS_BEAM, length), length));
 
   return {
     typeId: defaults.typeId,
