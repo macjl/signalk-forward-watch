@@ -47,10 +47,6 @@ class OpenCPNOutput {
             value: 0
           },
           {
-            path: 'mmsi',
-            value: String(d.ais.mmsi)
-          },
-          {
             path: 'communication',
             value: {
               callsignVhf: getCallSign(d.ais.mmsi)
