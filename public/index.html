@@ -719,8 +719,8 @@
       grid.className = 'item-grid';
       addField(grid, 'MMSI', detection.ais?.mmsi || '-');
       addField(grid, 'Distance', typeof detection.distance === 'number' ? `${detection.distance} m` : '-');
-      addField(grid, 'Box', detection.dimensions ? `${detection.dimensions.width} x ${detection.dimensions.height} m` : '-');
-      addField(grid, 'Length', typeof detection.ais?.length === 'number' ? `${detection.ais.length} m` : '-');
+      addField(grid, 'Length', detection.dimensions ? `${detection.dimensions.width} m` : '-');
+      addField(grid, 'Height', detection.dimensions ? `${detection.dimensions.height} m` : '-');
       addField(grid, 'Bearing', typeof detection.bearing === 'number' ? `${detection.bearing} deg` : '-');
       addField(grid, 'Side', detection.quadrant || '-');
 
@@ -742,7 +742,7 @@
       const parts = [name];
       if (detection.ais?.mmsi) parts.push(String(detection.ais.mmsi));
       if (typeof detection.distance === 'number') parts.push(`${detection.distance} m`);
-      if (typeof detection.ais?.length === 'number') parts.push(`L ${detection.ais.length} m`);
+      if (typeof detection.dimensions?.width === 'number') parts.push(`L ${detection.dimensions.width} m`);
       if (typeof detection.bearing === 'number') parts.push(`${detection.bearing} deg`);
       return parts.join(' | ');
     }

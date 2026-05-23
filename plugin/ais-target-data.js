@@ -1,10 +1,10 @@
 const AIS_STATIC_DATA = {
-  ship:   { typeId: 70, length: 80, beamRatio: 0.15, minLength: 20, maxLength: 200 },
-  boat:   { typeId: 37, length: 12, beamRatio: 0.33, minLength: 3, maxLength: 30 },
-  debris: { typeId: 99, length: 1, beamRatio: 1, minLength: 1, maxLength: 10 },
-  buoy:   { typeId: 99, length: 1, beamRatio: 1, minLength: 1, maxLength: 10 },
-  kayak:  { typeId: 37, length: 4, beamRatio: 0.25, minLength: 2, maxLength: 6 },
-  log:    { typeId: 99, length: 2, beamRatio: 0.5, minLength: 1, maxLength: 12 }
+  ship:   { typeId: 70, length: 80, beamRatio: 0.15, maxLength: 200 },
+  boat:   { typeId: 37, length: 12, beamRatio: 0.33, maxLength: 30 },
+  debris: { typeId: 99, length: 1, beamRatio: 1, maxLength: 10 },
+  buoy:   { typeId: 99, length: 1, beamRatio: 1, maxLength: 10 },
+  kayak:  { typeId: 37, length: 4, beamRatio: 0.25, maxLength: 6 },
+  log:    { typeId: 99, length: 2, beamRatio: 0.5, maxLength: 12 }
 };
 
 const SIDE_VIEW_ASPECT_RATIO = 1.4;
@@ -19,8 +19,8 @@ function getAisStaticData(detection) {
       ? apparentWidth
       : apparentWidth / defaults.beamRatio;
 
-  const length = roundMetres(clamp(estimatedLength, defaults.minLength, defaults.maxLength));
-  const beam = roundMetres(clamp(length * defaults.beamRatio, Math.min(2, length), length));
+  const length = roundMetres(clamp(estimatedLength, 0, defaults.maxLength));
+  const beam = roundMetres(clamp(length * defaults.beamRatio, 0, length));
 
   return {
     typeId: defaults.typeId,
@@ -34,7 +34,7 @@ function getApparentWidth(detection) {
   if (typeof width !== 'number') return null;
   const defaults = AIS_STATIC_DATA[detection.class_name] || AIS_STATIC_DATA.boat;
   if (!Number.isFinite(width) || width <= 0) return null;
-  return clamp(width, defaults.minLength * defaults.beamRatio, defaults.maxLength);
+  return clamp(width, 0, defaults.maxLength);
 }
 
 function getDetectionAspectRatio(detection) {
