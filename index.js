@@ -251,7 +251,7 @@ module.exports = function(app) {
           );
           const visibleDetections = enriched.map(d => {
             const target = targetByDetection.get(d);
-            const aisStaticData = d.position ? getAisStaticData(d) : null;
+            const aisStaticData = d.position ? getAisStaticData(d, this.calibration) : null;
             return Object.assign({}, d, target ? {
               ais: {
                 context: target.context,
@@ -269,7 +269,7 @@ module.exports = function(app) {
           this.latestDetections = visibleDetections;
 
           this.skOutput.sendDetections(enriched);
-          if (options.opencpn_enabled !== false) this.ocpnOutput.sendDetections(enriched);
+          if (options.opencpn_enabled !== false) this.ocpnOutput.sendDetections(enriched, this.calibration);
         } catch (err) {
           app.debug('Detection loop error: ' + err.message);
         } finally {

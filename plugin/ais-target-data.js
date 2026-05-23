@@ -7,12 +7,12 @@ const AIS_STATIC_DATA = {
   log:    { typeId: 99, length: 2, beamRatio: 0.5, minLength: 1, maxLength: 12 }
 };
 
-const HORIZONTAL_FOV_DEG = 60;
+const DEFAULT_HORIZONTAL_FOV_DEG = 60;
 const SIDE_VIEW_ASPECT_RATIO = 1.4;
 
-function getAisStaticData(detection) {
+function getAisStaticData(detection, calibration) {
   const defaults = AIS_STATIC_DATA[detection.class_name] || AIS_STATIC_DATA.boat;
-  const apparentWidth = getApparentWidth(detection);
+  const apparentWidth = getApparentWidth(detection, calibration);
   const isSideView = getDetectionAspectRatio(detection) >= SIDE_VIEW_ASPECT_RATIO;
   const estimatedLength = apparentWidth === null
     ? defaults.length
@@ -30,7 +30,7 @@ function getAisStaticData(detection) {
   };
 }
 
-function getApparentWidth(detection) {
+function getApparentWidth(detection, calibration) {
   if (
     typeof detection.distance !== 'number' ||
     typeof detection.w !== 'number'
@@ -39,10 +39,17 @@ function getApparentWidth(detection) {
   }
 
   const defaults = AIS_STATIC_DATA[detection.class_name] || AIS_STATIC_DATA.boat;
-  const angularWidthRad = Math.max(0, detection.w) * HORIZONTAL_FOV_DEG * (Math.PI / 180);
+  const horizontalFovDeg = getHorizontalFovDeg(calibration);
+  const angularWidthRad = Math.max(0, detection.w) * horizontalFovDeg * (Math.PI / 180);
   const apparentWidth = 2 * detection.distance * Math.tan(angularWidthRad / 2);
   if (!Number.isFinite(apparentWidth) || apparentWidth <= 0) return null;
   return clamp(apparentWidth, defaults.minLength * defaults.beamRatio, defaults.maxLength);
+}
+
+function getHorizontalFovDeg(calibration) {
+  const value = calibration && Number(calibration.camera_horizontal_fov_deg);
+  if (!Number.isFinite(value)) return DEFAULT_HORIZONTAL_FOV_DEG;
+  return clamp(value, 10, 180);
 }
 
 function getDetectionAspectRatio(detection) {
