@@ -34,7 +34,8 @@ class GpsCalculator {
     let distance_m;
     if (calibration.calibrated) {
       const targetY = Math.max(0, Math.min(1, detection.cy + detection.h / 2));
-      const verticalAngleDeg = (targetY - calibration.camera_horizon_y) * calibration.camera_vertical_fov_deg;
+      const horizonY = horizonAtX(detection.cx, calibration);
+      const verticalAngleDeg = (targetY - horizonY) * calibration.camera_vertical_fov_deg;
       const verticalAngleRad = Math.max(0.1, verticalAngleDeg) * Math.PI / 180;
       distance_m = Math.max(2, Math.min(500, calibration.camera_height_m / Math.tan(verticalAngleRad)));
     } else {
@@ -59,6 +60,13 @@ class GpsCalculator {
       confidence:  detection.confidence
     };
   }
+}
+
+function horizonAtX(x, calibration) {
+  const centerX = Math.max(0, Math.min(1, calibration.camera_center_x));
+  const span = Math.max(centerX, 1 - centerX, 0.001);
+  const normalizedX = (Math.max(0, Math.min(1, x)) - centerX) / span;
+  return Math.max(0, Math.min(1, calibration.camera_horizon_y + (calibration.camera_horizon_curve * normalizedX * normalizedX)));
 }
 
 module.exports = GpsCalculator;

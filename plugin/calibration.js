@@ -8,6 +8,7 @@ const DEFAULT_CALIBRATION = {
   camera_vertical_fov_deg: 34,
   camera_center_x: 0.5,
   camera_horizon_y: 0.5,
+  camera_horizon_curve: 0,
   frame_aspect: 16 / 9
 };
 
@@ -22,6 +23,7 @@ function normalizeCalibration(input, fallback) {
     camera_vertical_fov_deg: clampNumber(base.camera_vertical_fov_deg, 5, 160, DEFAULT_CALIBRATION.camera_vertical_fov_deg),
     camera_center_x: clampNumber(base.camera_center_x, 0, 1, DEFAULT_CALIBRATION.camera_center_x),
     camera_horizon_y: clampNumber(base.camera_horizon_y, 0, 1, DEFAULT_CALIBRATION.camera_horizon_y),
+    camera_horizon_curve: clampNumber(base.camera_horizon_curve, -0.5, 0.5, DEFAULT_CALIBRATION.camera_horizon_curve),
     frame_aspect: clampNumber(base.frame_aspect, 0.2, 5, DEFAULT_CALIBRATION.frame_aspect)
   };
 
