@@ -125,12 +125,16 @@ module.exports = function(app) {
 
       router.get('/api/latest-state', (req, res) => {
         res.setHeader('Cache-Control', 'no-store');
+        const attitude = plugin.options && plugin.options.attitude_correction_enabled
+          ? getNavigationAttitude(app)
+          : null;
         res.json({
           timestamp: plugin.latestTimestamp || null,
           frameVersion: plugin.latestFrameVersion || null,
           frameUrl: plugin.latestFrameVersion
             ? `/plugins/${plugin.id}/api/latest-frame?v=${encodeURIComponent(plugin.latestFrameVersion)}`
             : null,
+          virtualHorizon: createVirtualHorizon(plugin.calibration || loadCalibration(app), attitude),
           detections: plugin.latestDetections || []
         });
       });
@@ -178,6 +182,7 @@ module.exports = function(app) {
       this.latestTimestamp = null;
       this.latestDetections = [];
       this.calibration = loadCalibration(app);
+      this.options = options;
 
       // Load ONNX model
       await this.detector.init();
@@ -332,6 +337,17 @@ function getNavigationAttitude(app) {
   return {
     roll: typeof roll === 'number' ? roll : 0,
     pitch: typeof pitch === 'number' ? pitch : 0
+  };
+}
+
+function createVirtualHorizon(calibrationInput, attitude) {
+  const calibration = normalizeCalibration(calibrationInput, DEFAULT_CALIBRATION);
+  const pitchOffset = attitude ? radiansToDegrees(attitude.pitch || 0) / calibration.camera_vertical_fov_deg : 0;
+  return {
+    centerX: calibration.camera_center_x,
+    horizonY: Math.max(0, Math.min(1, calibration.camera_horizon_y + pitchOffset)),
+    rollDeg: calibration.camera_roll_deg + (attitude ? radiansToDegrees(attitude.roll || 0) : 0),
+    curve: calibration.camera_horizon_curve
   };
 }
 
