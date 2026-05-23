@@ -7,7 +7,7 @@ const Detector = require('./plugin/detector');
 const GpsCalculator = require('./plugin/gps-calculator');
 const SignalkOutput = require('./plugin/signalk-output');
 const OpenCPNOutput = require('./plugin/opencpn-output');
-const { assignTargetSlots } = require('./plugin/target-slots');
+const { TargetTracker } = require('./plugin/target-slots');
 const { getAisStaticData } = require('./plugin/ais-target-data');
 const { getDetectionDimensions } = require('./plugin/detection-geometry');
 const { DEFAULT_CALIBRATION, normalizeCalibration } = require('./plugin/calibration');
@@ -178,6 +178,7 @@ module.exports = function(app) {
       this.gpsCalc = new GpsCalculator(app);
       this.skOutput = new SignalkOutput(app, options);
       this.ocpnOutput = new OpenCPNOutput(app, options);
+      this.targetTracker = new TargetTracker();
       this.latestFramePath = null;
       this.latestFrameVersion = null;
       this.latestTimestamp = null;
@@ -249,9 +250,8 @@ module.exports = function(app) {
             typeof d.position.latitude === 'number' &&
             typeof d.position.longitude === 'number'
           );
-          const targetByDetection = new Map(
-            assignTargetSlots(withPosition).map(target => [target.detection, target])
-          );
+          const targets = this.targetTracker.assign(withPosition);
+          const targetByDetection = new Map(targets.map(target => [target.detection, target]));
           const visibleDetections = enriched.map(d => {
             const target = targetByDetection.get(d);
             const aisStaticData = d.position ? getAisStaticData(d) : null;
@@ -272,7 +272,7 @@ module.exports = function(app) {
           this.latestDetections = visibleDetections;
 
           this.skOutput.sendDetections(enriched);
-          if (options.opencpn_enabled !== false) this.ocpnOutput.sendDetections(enriched);
+          if (options.opencpn_enabled !== false) this.ocpnOutput.sendDetections(visibleDetections);
         } catch (err) {
           app.debug('Detection loop error: ' + err.message);
         } finally {

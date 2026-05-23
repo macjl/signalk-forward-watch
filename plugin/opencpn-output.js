@@ -1,42 +1,26 @@
 // Writes forward watch detections into Signal K as fake vessels
 // OpenCPN reads them via its existing Signal K connection and displays them as AIS targets
 
-const { assignTargetSlots } = require('./target-slots');
 const { getAisStaticData } = require('./ais-target-data');
 
 const PLUGIN_ID = 'signalk-forward-watch';
-const CLEAR_VALUES = [
-  { path: 'navigation.position', value: null },
-  { path: 'name', value: '' },
-  { path: 'sensors.ais.class', value: '' },
-  { path: 'navigation.courseOverGroundTrue', value: null },
-  { path: 'navigation.headingTrue', value: null },
-  { path: 'navigation.speedOverGround', value: null },
-  { path: 'communication.callsignVhf', value: '' },
-  { path: 'design.aisShipType.id', value: null },
-  { path: 'design.length.overall', value: null },
-  { path: 'design.beam', value: null }
-];
 
 class OpenCPNOutput {
   constructor(app, options) {
     this.app = app;
     this.options = options || {};
-    this.activeContexts = new Set();
   }
 
   sendDetections(detections) {
-    const withPos = detections.filter(d =>
+    const targets = detections.filter(d =>
+      d.ais &&
+      d.ais.context &&
       d.position &&
       typeof d.position.latitude === 'number' &&
       typeof d.position.longitude === 'number'
     );
 
-    const targets = assignTargetSlots(withPos);
-    const currentContexts = new Set(targets.map(target => target.context));
-
-    for (const target of targets) {
-      const { detection: d, context, label } = target;
+    for (const d of targets) {
       const values = [
         {
           path: 'navigation.position',
@@ -47,7 +31,7 @@ class OpenCPNOutput {
         },
         {
           path: 'name',
-          value: `${label} (${Math.round(d.confidence * 100)}%)`
+          value: `${d.ais.label} (${Math.round(d.confidence * 100)}%)`
         }
       ];
 
@@ -73,7 +57,7 @@ class OpenCPNOutput {
           },
           {
             path: 'communication.callsignVhf',
-            value: getCallSign(target.mmsi)
+            value: getCallSign(d.ais.mmsi)
           },
           {
             path: 'design.aisShipType.id',
@@ -91,38 +75,19 @@ class OpenCPNOutput {
       }
 
       this.app.handleMessage(PLUGIN_ID, {
-        context: `vessels.${context}`,
+        context: `vessels.${d.ais.context}`,
         updates: [{
           values
         }]
       });
 
-      this.app.debug(`OpenCPN: ${label} → ${context} at ${d.position.latitude.toFixed(4)},${d.position.longitude.toFixed(4)}`);
+      this.app.debug(`OpenCPN: ${d.ais.label} → ${d.ais.context} at ${d.position.latitude.toFixed(4)},${d.position.longitude.toFixed(4)}`);
     }
-
-    for (const context of this.activeContexts) {
-      if (!currentContexts.has(context)) this.clearTarget(context);
-    }
-
-    this.activeContexts = currentContexts;
   }
 
   stop() {
-    for (const context of this.activeContexts) {
-      this.clearTarget(context);
-    }
-    this.activeContexts.clear();
-  }
-
-  clearTarget(context) {
-    this.app.handleMessage(PLUGIN_ID, {
-      context: `vessels.${context}`,
-      updates: [{
-        values: CLEAR_VALUES
-      }]
-    });
-
-    this.app.debug(`OpenCPN: cleared ${context}`);
+    // Leave the last published virtual AIS values untouched. Some Signal K
+    // converters do not handle null clears for AIS string/numeric fields.
   }
 
   isNmeaExportCompatEnabled() {
