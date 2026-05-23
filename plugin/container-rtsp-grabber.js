@@ -94,9 +94,21 @@ class ContainerRtspGrabber {
       throw new Error(`Forward Watch frame path is outside the plugin data directory: ${this.framePath}`);
     }
 
+    if (typeof this.containers.resolveHostPath !== 'function') {
+      throw new Error('signalk-container does not provide resolveHostPath; please update signalk-container');
+    }
+
+    const resolved = await this.containers.resolveHostPath(this.dataDir);
+    if (!resolved) {
+      throw new Error(
+        'signalk-container could not resolve Forward Watch data directory for the FFmpeg container. ' +
+          'If Signal K runs in Docker with host networking, set SIGNALK_CONTAINER_ID to the Signal K container name.'
+      );
+    }
+
     return {
-      config: { signalkDataMount: DATA_MOUNT },
-      containerFramePath: path.posix.join(DATA_MOUNT, toPosix(relativeFramePath))
+      config: { volumes: { [DATA_MOUNT]: resolved.source } },
+      containerFramePath: path.posix.join(DATA_MOUNT, toPosix(resolved.subPath || ''), toPosix(relativeFramePath))
     };
   }
 

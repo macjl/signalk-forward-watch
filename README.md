@@ -70,7 +70,7 @@ Container mode is intended for Signal K deployments where the server itself runs
 
 Forward Watch starts one persistent managed container named `sk-forward-watch-ffmpeg`. It runs ffmpeg for the lifetime of the plugin, writes the latest RTSP frame to the plugin data directory, and is stopped when the plugin is disabled. The container is not recreated for every frame.
 
-The container gets access to Forward Watch's plugin data directory via `signalkDataMount`, then writes to `frames/latest.jpg` inside that directory. This keeps the frame file visible to the detector whether Signal K is running bare-metal or inside a container.
+The container gets access to Forward Watch's plugin data directory through `signalk-container` path resolution, then writes to `frames/latest.jpg` inside that directory. This keeps the frame file visible to the detector whether Signal K is running bare-metal or inside a container. If Signal K itself runs in Docker with host networking and the container cannot be detected automatically, set `SIGNALK_CONTAINER_ID` to the Signal K container name.
 
 If the container keeps running but stops updating `latest.jpg`, Forward Watch treats the frame as stale and restarts the managed FFmpeg container. This handles RTSP sessions that remain alive at Docker level while ffmpeg is no longer producing fresh JPEGs.
 
