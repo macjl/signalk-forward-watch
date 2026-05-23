@@ -30,11 +30,25 @@ class GpsCalculator {
   calculate(detection, boatLat, boatLon, boatHeading, calibrationInput, attitudeInput) {
     if (boatLat === null || boatLon === null) return null;
     const calibration = normalizeCalibration(calibrationInput, DEFAULT_CALIBRATION);
+    const pitchOffset = attitudeInput ? radiansToDegrees(attitudeInput.pitch || 0) / calibration.camera_vertical_fov_deg : 0;
+    const rollRad = degreesToRadians(calibration.camera_roll_deg) + (attitudeInput ? attitudeInput.roll || 0 : 0);
+    const center = {
+      x: calibration.camera_center_x,
+      y: Math.max(0, Math.min(1, calibration.camera_horizon_y + pitchOffset))
+    };
+    const targetBottom = levelPoint({
+      x: detection.cx,
+      y: Math.max(0, Math.min(1, detection.cy + detection.h / 2))
+    }, center, rollRad, calibration.frame_aspect);
+    const bearingPoint = levelPoint({
+      x: detection.cx,
+      y: detection.cy
+    }, center, rollRad, calibration.frame_aspect);
 
     let distance_m;
     if (calibration.calibrated) {
-      const targetY = Math.max(0, Math.min(1, detection.cy + detection.h / 2));
-      const horizonY = horizonAtX(detection.cx, calibration, attitudeInput);
+      const targetY = Math.max(0, Math.min(1, targetBottom.y));
+      const horizonY = horizonAtX(targetBottom.x, calibration, pitchOffset);
       const verticalAngleDeg = (targetY - horizonY) * calibration.camera_vertical_fov_deg;
       const verticalAngleRad = Math.max(0.1, verticalAngleDeg) * Math.PI / 180;
       distance_m = Math.max(2, Math.min(500, calibration.camera_height_m / Math.tan(verticalAngleRad)));
@@ -45,7 +59,7 @@ class GpsCalculator {
 
     const bearing_deg = (
       boatHeading +
-      ((detection.cx - calibration.camera_center_x) * calibration.camera_horizontal_fov_deg) +
+      ((bearingPoint.x - calibration.camera_center_x) * calibration.camera_horizontal_fov_deg) +
       360
     ) % 360;
 
@@ -62,19 +76,32 @@ class GpsCalculator {
   }
 }
 
-function horizonAtX(x, calibration, attitude) {
+function horizonAtX(x, calibration, pitchOffset) {
   const centerX = Math.max(0, Math.min(1, calibration.camera_center_x));
   const clampedX = Math.max(0, Math.min(1, x));
   const span = Math.max(centerX, 1 - centerX, 0.001);
   const normalizedX = (clampedX - centerX) / span;
-  const pitchOffset = attitude ? radiansToDegrees(attitude.pitch || 0) / calibration.camera_vertical_fov_deg : 0;
-  const rollOffset = attitude ? Math.tan(attitude.roll || 0) * (clampedX - centerX) * calibration.frame_aspect : 0;
   const horizonY = calibration.camera_horizon_y +
     (calibration.camera_horizon_curve * normalizedX * normalizedX) +
-    pitchOffset +
-    rollOffset;
+    pitchOffset;
 
   return Math.max(0, Math.min(1, horizonY));
+}
+
+function levelPoint(point, center, rollRad, frameAspect) {
+  const dx = (point.x - center.x) * frameAspect;
+  const dy = point.y - center.y;
+  const cos = Math.cos(-rollRad);
+  const sin = Math.sin(-rollRad);
+
+  return {
+    x: center.x + ((dx * cos) - (dy * sin)) / frameAspect,
+    y: center.y + (dx * sin) + (dy * cos)
+  };
+}
+
+function degreesToRadians(value) {
+  return value * Math.PI / 180;
 }
 
 function radiansToDegrees(value) {

@@ -272,6 +272,7 @@ A Signal K notification is sent for any detection **within 100m**. One notificat
 **Distance estimates seem wrong**
 - This is expected. Monocular depth estimation from a single camera is inherently imprecise. Use as a rough guide only.
 - Accuracy improves for larger objects that fill more of the frame.
+- Use the WebApp calibration view to set camera height, field of view, forward axis, horizon, camera roll, and horizon curve.
 - If your vessel publishes `navigation.attitude`, enable attitude correction to adjust the calibrated horizon for heel and trim.
 
 **No GPS position in detections**
