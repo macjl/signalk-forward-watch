@@ -7,12 +7,12 @@ const { getAisStaticData } = require('./ais-target-data');
 const PLUGIN_ID = 'signalk-forward-watch';
 const CLEAR_VALUES = [
   { path: 'navigation.position', value: null },
-  { path: 'name', value: null },
-  { path: 'sensors.ais.class', value: null },
+  { path: 'name', value: '' },
+  { path: 'sensors.ais.class', value: '' },
   { path: 'navigation.courseOverGroundTrue', value: null },
   { path: 'navigation.headingTrue', value: null },
   { path: 'navigation.speedOverGround', value: null },
-  { path: 'communication.callsignVhf', value: null },
+  { path: 'communication.callsignVhf', value: '' },
   { path: 'design.aisShipType.id', value: null },
   { path: 'design.length.overall', value: null },
   { path: 'design.beam', value: null }
