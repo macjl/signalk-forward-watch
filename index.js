@@ -127,7 +127,7 @@ module.exports = function(app) {
       router.get('/api/latest-state', (req, res) => {
         res.setHeader('Cache-Control', 'no-store');
         const attitude = plugin.options && plugin.options.attitude_correction_enabled
-          ? getNavigationAttitude(app)
+          ? plugin.latestAttitude || null
           : null;
         res.json({
           timestamp: plugin.latestTimestamp || null,
@@ -182,6 +182,7 @@ module.exports = function(app) {
       this.latestFramePath = null;
       this.latestFrameVersion = null;
       this.latestTimestamp = null;
+      this.latestAttitude = null;
       this.latestDetections = [];
       this.calibration = loadCalibration(app);
       this.options = options;
@@ -269,6 +270,7 @@ module.exports = function(app) {
           this.latestFramePath = framePath;
           this.latestFrameVersion = getFrameVersion(framePath);
           this.latestTimestamp = new Date().toISOString();
+          this.latestAttitude = attitude;
           this.latestDetections = visibleDetections;
 
           this.skOutput.sendDetections(enriched);
